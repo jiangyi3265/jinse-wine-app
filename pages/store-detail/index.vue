@@ -2,7 +2,7 @@
   <PageShell title="门店二维码">
     <template v-if="store">
       <view class="store-hero">
-        <image src="/static/design/hero-product.jpg" mode="aspectFill" />
+        <image :src="displayValue(config.brand.storeHeroImage, assetUrl('/static/design/hero-product.jpg', 'brand.store'))" mode="aspectFill" />
         <view class="store-hero-copy">
           <text class="serif">金色酒业</text>
           <text class="store-hero-sub">传承酱香　酿造美好</text>
@@ -58,6 +58,7 @@ import QrCode from '../../components/QrCode.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { stores } from '../../services/catalog.js'
 import { go, contact, callStore, locateStore } from '../../services/navigation.js'
+import { config, displayValue, assetUrl } from '../../services/config.js'
 const id = ref('guigang')
 onLoad((q) => {
   id.value = q.id || 'guigang'

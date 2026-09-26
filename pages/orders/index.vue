@@ -53,16 +53,20 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, setOrderStatus } from '../../services/store.js'
+import { state, setOrderStatus, refreshDomain } from '../../services/store.js'
+import { isApiMode } from '../../services/config.js'
 import { getProduct } from '../../services/catalog.js'
 import { money } from '../../services/pricing.js'
 import { go, statusLabels, confirm, run } from '../../services/navigation.js'
 const tab = ref('all')
 onLoad((q) => {
   tab.value = q.status || 'all'
+})
+onShow(() => {
+  if (isApiMode()) refreshDomain('orders').catch((error) => run(() => { throw error }))
 })
 const tabs = [
   { id: 'all', label: '全部' },

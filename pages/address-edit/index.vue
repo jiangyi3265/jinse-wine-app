@@ -50,7 +50,7 @@ import { reactive } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import { state, saveAddress } from '../../services/store.js'
-import { back, run } from '../../services/navigation.js'
+import { back, toast } from '../../services/navigation.js'
 const form = reactive({
   id: '',
   name: '',
@@ -63,10 +63,10 @@ onLoad((q) => {
   const item = state.addresses.find((a) => a.id === q.id)
   if (item) Object.assign(form, item)
 })
-function save() {
-  run(() => {
-    saveAddress({ ...form })
+async function save() {
+  try {
+    await saveAddress({ ...form })
     back()
-  })
+  } catch (error) { toast(error.message) }
 }
 </script>

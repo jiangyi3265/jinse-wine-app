@@ -14,8 +14,13 @@ export function go(name, query = {}) {
   else uni.navigateTo({ url, fail: () => uni.redirectTo({ url }) })
 }
 export function back() {
-  if (getCurrentPages().length > 1) uni.navigateBack()
-  else go('index')
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+  if (pages.length > 1) {
+    // 部分开发者工具直达页面时路由栈不完整，返回失败时统一回到首页。
+    uni.navigateBack({ delta: 1, fail: () => go('index') })
+    return
+  }
+  go('index')
 }
 export function toast(title) {
   uni.showToast({ title, icon: 'none', duration: 2300 })
@@ -30,9 +35,9 @@ export async function confirm(title, content, confirmText = '确认') {
   })
   return result.confirm
 }
-export function run(action) {
+export async function run(action) {
   try {
-    return action()
+    return await action()
   } catch (error) {
     toast(error.message)
     return false
@@ -59,7 +64,9 @@ export function locateStore(store) {
   })
 }
 export function dateLabel(time) {
+  if (!time) return '—'
   const date = new Date(time)
+  if (Number.isNaN(date.getTime())) return '—'
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 export const statusLabels = {

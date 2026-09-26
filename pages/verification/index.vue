@@ -2,7 +2,7 @@
   <PageShell title="门店核销">
     <view v-if="state.user.role === 'staff'" class="section">
       <view class="staff-header">
-        <image src="/static/design/store.jpg" mode="aspectFill" />
+        <image :src="assetUrl('/static/design/store.jpg', 'brand.store')" mode="aspectFill" />
         <view class="grow column">
           <text class="store-name">金色酒业体验店</text>
           <text class="member-badge ink" style="border-color: #496356">♙ 核销员</text>
@@ -97,15 +97,22 @@ import { ref, computed } from 'vue'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, verifyAward } from '../../services/store.js'
+import { state, verifyAward, lookupAward, refreshDomain } from '../../services/store.js'
+import { isApiMode, assetUrl } from '../../services/config.js'
 import { go, toast, confirm } from '../../services/navigation.js'
 const selected = ref(state.awards.find((a) => a.status === 'pending')?.code || ''),
   codeInput = ref(''),
   manual = ref(false),
   busy = ref(false)
 const award = computed(() => state.awards.find((a) => a.code === selected.value))
-function lookup() {
+async function lookup() {
   selected.value = codeInput.value.trim()
+  if (isApiMode()) {
+    try {
+      const result = await lookupAward(selected.value)
+      state.awards = [result, ...state.awards.filter((item) => item.code !== selected.value)]
+    } catch (error) { return toast(error.message) }
+  }
   if (!award.value) toast('未找到奖品，请核对兑换码')
 }
 function scan() {
@@ -138,11 +145,11 @@ async function verify() {
     if (
       await confirm(
         '确认核销奖品',
-        `确认已向顾客发放${award.value.name}？当前操作只更新演示记录，核销后不可重复兑换。`,
+        `确认已向顾客发放${award.value.name}？核销后不可重复兑换。`,
         '确认核销',
       )
     ) {
-      verifyAward(selected.value)
+      await verifyAward(selected.value)
       toast('核销成功')
     }
   } catch (e) {

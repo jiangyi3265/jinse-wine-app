@@ -1,7 +1,7 @@
 <template>
   <view class="qr-block">
     <image
-      :src="src || '/static/design/qr-demo.png'"
+      :src="src || assetUrl('/static/design/qr-demo.png', 'brand.qr')"
       class="qr-image"
       mode="aspectFit"
       :show-menu-by-longpress="!!src"
@@ -10,6 +10,7 @@
   </view>
 </template>
 <script setup>
+import { assetUrl } from '../services/config.js'
 defineProps({ src: String })
 </script>
 <style scoped>

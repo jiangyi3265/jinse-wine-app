@@ -15,17 +15,17 @@
         <text class="promotion-total-label">累计佣金</text>
         <view class="promotion-money">
           <text class="currency">¥</text>
-          1,280.00
+          {{ (total / 100).toFixed(2) }}
         </view>
       </view>
       <view class="promotion-splits">
         <view>
           <text class="small block">待结算</text>
-          <text class="serif">¥320.00</text>
+          <text class="serif">¥{{ (pending / 100).toFixed(2) }}</text>
         </view>
         <view>
           <text class="small block">已结算</text>
-          <text class="serif">¥960.00</text>
+          <text class="serif">¥{{ (settled / 100).toFixed(2) }}</text>
         </view>
       </view>
     </view>
@@ -39,7 +39,7 @@
           <AppIcon name="users" />
           我的团队
         </view>
-        <text class="muted small">12人</text>
+        <text class="muted small">{{ teamCount }}人</text>
         <AppIcon name="chevron" :size="17" />
       </button>
       <button class="link-row" @click="go('ranking')">
@@ -54,7 +54,7 @@
         <text class="muted small">订单核销后计入佣金</text>
       </view>
       <button
-        v-for="(p, index) in products.slice(0, 2)"
+        v-for="(p, index) in commissionItems"
         :key="p.id"
         class="commission-row"
         style="width: 100%; text-align: left"
@@ -65,20 +65,36 @@
           <text class="strong block">{{ p.name }}</text>
           <text class="small muted">{{ p.spec }}</text>
         </view>
-        <text :class="['badge', index ? 'badge-gold' : 'badge-green']">
-          {{ index ? '待核销' : '已核销' }}
+          <text :class="['badge', p.status === 'settled' ? 'badge-green' : 'badge-gold']">
+          {{ p.status === 'settled' ? '已核销' : '待核销' }}
         </text>
-        <text class="amount">{{ index ? '待计佣' : '+¥39.80' }}</text>
+        <text class="amount">{{ p.status === 'settled' ? `+¥${(p.amount / 100).toFixed(2)}` : '待计佣' }}</text>
         <AppIcon name="chevron" :size="15" />
       </button>
-      <text class="profile-demo">演示推广业绩，实际佣金以服务端结算为准</text>
+      <text class="profile-demo">{{ isApiMode() ? '实际佣金以服务端结算为准' : '演示推广业绩，实际佣金以服务端结算为准' }}</text>
     </view>
   </PageShell>
 </template>
 <script setup>
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
-import { state } from '../../services/store.js'
-import { products } from '../../services/catalog.js'
-import { go } from '../../services/navigation.js'
+import { computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { state, refreshDomain } from '../../services/store.js'
+import { products, loadCatalog } from '../../services/catalog.js'
+import { go, toast } from '../../services/navigation.js'
+import { isApiMode } from '../../services/config.js'
+const total = computed(() => state.promotion?.total || 0)
+const pending = computed(() => state.promotion?.pending || 0)
+const settled = computed(() => state.promotion?.settled || 0)
+const teamCount = computed(() => state.promotion?.teamCount || 0)
+const commissionItems = computed(() => state.promotion?.records?.length
+  ? state.promotion.records
+  : isApiMode() ? [] : products.slice(0, 2).map((product, index) => ({
+      ...product, status: index ? 'pending' : 'settled', amount: index ? 0 : 3980,
+    })))
+onShow(async () => {
+  try { await loadCatalog(); if (isApiMode()) await refreshDomain('promotion') }
+  catch (error) { toast(error.message) }
+})
 </script>

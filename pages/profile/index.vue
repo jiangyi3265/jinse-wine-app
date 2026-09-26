@@ -2,7 +2,7 @@
   <PageShell title="我的" dark brand left active="profile" :back-button="false">
     <view class="profile-hero">
       <button class="row" style="text-align: left" @click="go('profile-edit')">
-        <image src="/static/design/avatar.jpg" class="profile-avatar" mode="aspectFill" />
+        <image :src="displayValue(state.user.avatar, assetUrl('/static/design/avatar.jpg', 'brand.avatar'))" class="profile-avatar" mode="aspectFill" />
         <view class="column">
           <text class="profile-name">{{ state.user.name }}</text>
           <text class="member-badge">VIP会员　›</text>
@@ -68,19 +68,25 @@
         </view>
         <AppIcon name="chevron" :size="16" />
       </button>
-      <text class="profile-demo">演示账户 · 商品及权益均为示例</text>
+      <text class="profile-demo">{{ state.user.name === '微信用户' ? '请登录后查看完整会员权益' : '商品及权益以服务端数据为准' }}</text>
     </view>
   </PageShell>
 </template>
 <script setup>
 import { computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
-import { state } from '../../services/store.js'
-import { go } from '../../services/navigation.js'
+import { state, refreshDomain } from '../../services/store.js'
+import { go, toast } from '../../services/navigation.js'
+import { displayValue, assetUrl } from '../../services/config.js'
 const unused = computed(
   () => state.coupons.filter((c) => c.status === 'unused' && c.expiresAt > Date.now()).length,
 )
+onShow(async () => {
+  try { await Promise.all([refreshDomain('user'), refreshDomain('points'), refreshDomain('coupons'), refreshDomain('awards'), refreshDomain('orders')]) }
+  catch (error) { toast(error.message) }
+})
 const orderLinks = [
   { status: 'pending', icon: 'wallet', name: '待付款' },
   { status: 'shipping', icon: 'truck', name: '待发货' },

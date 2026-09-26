@@ -5,8 +5,8 @@
       <input v-model="keyword" placeholder="搜索门店或地址" aria-label="搜索门店或地址" />
     </view>
     <view class="store-map">
-      <image src="/static/design/map.jpg" mode="aspectFill" />
-      <text class="map-caption">示意地图 · 距离为演示数据</text>
+      <image :src="displayValue(config.brand.mapImage, assetUrl('/static/design/map.jpg', 'brand.map'))" mode="aspectFill" />
+      <text class="map-caption">{{ isApiMode() ? '门店位置由服务端配置' : '示意地图 · 距离为演示数据' }}</text>
       <button class="map-locate" aria-label="定位当前" @click="locate">
         <AppIcon name="location" :size="26" />
       </button>
@@ -22,7 +22,7 @@
           <view class="grow column">
             <view class="between">
               <text class="store-name">{{ store.name }}</text>
-              <text class="store-distance">{{ store.distance }}km</text>
+              <text class="store-distance">{{ store.distance === '—' ? '距离待计算' : `${store.distance}km` }}</text>
             </view>
             <text class="muted small">{{ store.address }}</text>
             <view class="row">
@@ -58,25 +58,28 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { stores } from '../../services/catalog.js'
+import { stores, loadCatalog } from '../../services/catalog.js'
 import { go, toast, callStore, locateStore } from '../../services/navigation.js'
+import { config, displayValue, isApiMode, assetUrl } from '../../services/config.js'
 const keyword = ref(''),
-  district = ref('贵港')
+  district = ref(isApiMode() ? '' : '贵港')
+onShow(() => loadCatalog().catch((error) => toast(error.message)))
 const filtered = computed(() =>
   stores.filter(
     (s) =>
-      (district.value === '贵港' || s.district === district.value) &&
+      (!district.value || s.city === district.value || s.district === district.value) &&
       `${s.name}${s.address}`.includes(keyword.value.trim()),
   ),
 )
 function citySheet() {
   uni.showActionSheet({
-    itemList: ['贵港', '港北区', '港南区'],
+    itemList: ['全部', ...new Set(stores.flatMap((item) => [item.city, item.district]).filter(Boolean))],
     success: (r) => {
-      district.value = ['贵港', '港北区', '港南区'][r.tapIndex]
+      district.value = ['全部', ...new Set(stores.flatMap((item) => [item.city, item.district]).filter(Boolean))][r.tapIndex] || ''
     },
   })
 }
@@ -85,6 +88,6 @@ function locate() {
 }
 function resetFilters() {
   keyword.value = ''
-  district.value = '贵港'
+  district.value = isApiMode() ? '' : '贵港'
 }
 </script>

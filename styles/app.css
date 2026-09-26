@@ -600,6 +600,18 @@ page {
   width: 51%;
   height: 100%;
 }
+.page-shell .hero-home-swiper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.page-shell .hero-home-swiper swiper-item {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
 .page-shell .hero-home:after {
   content: '';
   position: absolute;

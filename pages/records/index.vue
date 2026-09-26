@@ -22,7 +22,7 @@
             class="small block"
             :class="item.status === 'pending' ? 'gold' : 'ink'"
           >
-            {{ item.status === 'pending' ? '待领取' : '演示已到账' }}
+            {{ item.status === 'pending' ? '待领取' : '到账状态以服务端为准' }}
           </text>
         </view>
         <text class="record-value" :class="item.change > 0 ? 'ink' : ''">
@@ -48,16 +48,22 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state } from '../../services/store.js'
+import { state, refreshDomain } from '../../services/store.js'
+import { isApiMode } from '../../services/config.js'
 import { money } from '../../services/pricing.js'
-import { go, dateLabel } from '../../services/navigation.js'
+import { go, dateLabel, toast } from '../../services/navigation.js'
 const type = ref('draw')
 onLoad((q) => {
   type.value = q.type || 'draw'
+})
+onShow(() => {
+  if (!isApiMode()) return
+  const domain = type.value === 'points' ? 'pointRecords' : type.value === 'commission' ? 'promotion' : type.value === 'cash' ? 'redPackets' : null
+  if (domain) refreshDomain(domain).catch((error) => toast(error.message))
 })
 const title = computed(
   () =>
@@ -77,7 +83,9 @@ const records = computed(() =>
       : type.value === 'verification'
         ? state.verificationRecords
         : type.value === 'commission'
-          ? [
+        ? isApiMode()
+          ? state.promotion?.records || []
+          : [
               {
                 id: 'commission-1',
                 title: '典藏酱香 · 已核销',

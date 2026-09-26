@@ -58,10 +58,13 @@ import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import CouponCard from '../../components/CouponCard.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { couponTemplates, getProduct } from '../../services/catalog.js'
+import { couponTemplates, getProduct, loadCatalog } from '../../services/catalog.js'
 import { state, claimCoupon, persist } from '../../services/store.js'
 import { couponEligibility } from '../../services/pricing.js'
-import { go, back, toast, run } from '../../services/navigation.js'
+import { go, back, toast } from '../../services/navigation.js'
+import { onShow } from '@dcloudio/uni-app'
+import { isApiMode } from '../../services/config.js'
+import { refreshDomain } from '../../services/store.js'
 const props = defineProps({ mine: { type: Boolean, default: true } }),
   mode = ref(''),
   tab = ref('全部'),
@@ -70,6 +73,10 @@ onLoad((q) => {
   mode.value = q.mode || ''
   mine.value = q.mine === '1' || props.mine
   tab.value = mine.value ? '未使用' : '全部'
+})
+onShow(async () => {
+  try { await loadCatalog(); if (isApiMode()) await refreshDomain('coupons') }
+  catch (error) { toast(error.message) }
 })
 const selecting = computed(() => mode.value === 'select'),
   tabs = computed(() =>
@@ -135,13 +142,13 @@ function choose(c) {
   persist()
   back()
 }
-function handle(c) {
+async function handle(c) {
   if (selecting.value) return choose(c)
   if (mine.value) return go('shop')
-  run(() => {
-    claimCoupon(c.id)
+  try {
+    await claimCoupon(c.id)
     toast('领取成功，可在我的优惠券中查看')
-  })
+  } catch (error) { toast(error.message) }
 }
 function rules(c) {
   go('rules', { type: 'coupon', id: c.templateId || c.id })

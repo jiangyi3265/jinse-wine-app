@@ -19,7 +19,7 @@
         <button class="detail-coupon" @click="go('coupons')">
           <AppIcon name="coupon" :size="23" />
           <text class="strong">领券</text>
-          <text>满200减15</text>
+          <text>{{ displayValue(highlightCoupon?.description, '满200减15') }}</text>
           <AppIcon name="chevron" :size="15" />
         </button>
         <button class="link-row" @click="sheet = true">
@@ -38,7 +38,7 @@
         </button>
         <view class="section-heading"><text class="section-title serif">商品详情</text></view>
         <view class="detail-story serif">
-          <image src="/static/design/detail-landscape.jpg" mode="aspectFill" />
+          <image :src="displayValue(product.image, assetUrl('/static/design/detail-landscape.jpg', 'brand.productDetail'))" mode="aspectFill" />
           <text>
             传承酱香本味
             <br />
@@ -59,7 +59,7 @@
             <text>{{ product.category === '礼盒' ? '礼盒装' : '单瓶装' }}</text>
           </view>
           <text class="muted small block section-space">
-            图片为设计示例，商品信息以实际包装为准。
+            {{ isApiMode() ? '商品信息由服务端维护，以实际包装为准。' : '图片为设计示例，商品信息以实际包装为准。' }}
           </text>
         </view>
       </view>
@@ -111,31 +111,40 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import PriceTag from '../../components/PriceTag.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { getProduct } from '../../services/catalog.js'
+import { getProduct, loadCatalog, couponTemplates } from '../../services/catalog.js'
 import { prepareCheckout } from '../../services/store.js'
-import { go, contact, run } from '../../services/navigation.js'
+import { go, contact, run, toast } from '../../services/navigation.js'
+import { displayValue, isApiMode, assetUrl } from '../../services/config.js'
 const id = ref('classic'),
   quantity = ref(1),
   sheet = ref(false),
   slide = ref(0)
 onLoad((q) => {
-  id.value = q.id || 'classic'
+  id.value = q.id || (isApiMode() ? '' : 'classic')
 })
+onShow(() => loadCatalog().catch((error) => toast(error.message)))
 const product = computed(() => getProduct(id.value)),
+  highlightCoupon = computed(() => couponTemplates.find((item) => !item.pointsOnly) || couponTemplates[0]),
   photos = computed(() =>
     product.value
-      ? [
-          product.value.id === 'classic'
-            ? '/static/design/detail-scene-clean.jpg'
-            : product.value.image,
-          product.value.image,
-          product.value.id === 'classic' ? '/static/design/hero-product.jpg' : product.value.image,
-        ]
+      ? isApiMode()
+        ? [
+            product.value.image,
+            assetUrl('/static/design/detail-scene-clean.jpg', 'brand.productStory'),
+            assetUrl('/static/design/hero-product.jpg', 'home.hero'),
+          ].filter(Boolean)
+        : [
+            product.value.id === 'classic'
+              ? assetUrl('/static/design/detail-scene-clean.jpg', 'brand.productStory')
+              : product.value.image,
+            product.value.image,
+            product.value.id === 'classic' ? assetUrl('/static/design/hero-product.jpg', 'home.hero') : product.value.image,
+          ].filter(Boolean)
       : [],
   )
 function buy() {

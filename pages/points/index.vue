@@ -1,7 +1,7 @@
 <template>
   <PageShell title="积分兑换">
     <view class="points-hero">
-      <image src="/static/design/detail-scene-clean.jpg" mode="aspectFill" />
+      <image :src="assetUrl('/static/design/detail-scene-clean.jpg', 'brand.points')" mode="aspectFill" />
       <view class="points-info">
         <text class="block small">可用积分 ›</text>
         <text class="points-balance">{{ state.points.toLocaleString() }}</text>
@@ -36,10 +36,10 @@
         </view>
         <button
           class="btn btn-small"
-          :disabled="busy === item.id || !state.exchangeStock[item.id]"
+          :disabled="busy === item.id || (isApiMode() ? !item.stock : !state.exchangeStock[item.id])"
           @click="exchange(item)"
         >
-          {{ state.exchangeStock[item.id] ? '兑换' : '已兑完' }}
+          {{ (isApiMode() ? item.stock : state.exchangeStock[item.id]) ? '兑换' : '已兑完' }}
         </button>
       </view>
       <view class="notice section-space">
@@ -59,9 +59,11 @@
 import { ref, computed } from 'vue'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
-import { exchangeProducts } from '../../services/catalog.js'
-import { state, exchangeReward } from '../../services/store.js'
+import { exchangeProducts, loadCatalog } from '../../services/catalog.js'
+import { state, exchangeReward, refreshDomain } from '../../services/store.js'
 import { go, toast, confirm } from '../../services/navigation.js'
+import { onShow } from '@dcloudio/uni-app'
+import { isApiMode, assetUrl } from '../../services/config.js'
 const tab = ref('全部'),
   busy = ref(''),
   filtered = computed(() =>
@@ -69,6 +71,10 @@ const tab = ref('全部'),
       (p) => tab.value === '全部' || p.kind === (tab.value === '优惠券' ? 'coupon' : 'goods'),
     ),
   )
+onShow(async () => {
+  try { await loadCatalog(); if (state.user) await Promise.all([refreshDomain('points'), refreshDomain('pointRecords')]) }
+  catch (error) { toast(error.message) }
+})
 async function exchange(item) {
   if (busy.value) return
   if (state.points < item.points) return toast('积分不足，暂时无法兑换')
@@ -77,12 +83,12 @@ async function exchange(item) {
     if (
       !(await confirm(
         '确认兑换',
-        `使用${item.points}积分兑换${item.name}？本次使用演示积分。`,
+        `使用${item.points}积分兑换${item.name}？${isApiMode() ? '积分将由服务端校验并扣减。' : '本次使用演示积分。'}`,
         '确认兑换',
       ))
     )
       return
-    const kind = exchangeReward(item.id)
+    const kind = await exchangeReward(item.id)
     if (
       await confirm(
         '兑换成功',

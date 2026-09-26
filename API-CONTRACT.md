@@ -1,11 +1,11 @@
 # 前端服务对接约定
 
-以下是为后续后端联调预留的建议接口约定，不代表后台已经实现。
+以下为三端当前统一服务契约。目录、会员交易、积分兑换、抽奖、奖品、核销和推广接口已经提供；微信真实凭据缺失时，登录、支付和现金到账按约定返回配置错误。
 
 ## 共通约定
 
 - 金额使用整数分，折扣用整数百分比，例如95表示9.5折。
-- 分页：`page`, `pageSize`；响应示例 `{ code: 0, data, message }`。
+- 分页：管理端使用 `pageNum`, `pageSize`；小程序列表目前按会员返回有限列表。小程序响应为 `{ code: 0, data, message }`，管理端沿用若依 `{ code: 200, rows, total, msg }`。
 - 用户身份由登录会话及服务端鉴权确定，不能信任客户端userId、role、积分、价格或中奖结果。
 - 订单、转账、兑奖、积分兑换等写操作使用服务端发放的幂等键。
 - 前端的展示状态由服务端返回的最终或处理中状态驱动，不从弹窗确认或微信界面唤起成功推断已付款/到账。
@@ -13,6 +13,7 @@
 | 功能 | 建议接口 | 主要字段/约束 |
 | --- | --- | --- |
 | 登录 | POST /mini/auth/wechat | code交换登录态，OpenID关联在服务端完成 |
+| 会员资料 | GET/PATCH /mini/me | 仅允许修改昵称，手机号、VIP和角色由服务端维护 |
 | 商品 | GET /mini/products、GET /mini/products/:id | id,name,spec,price,originalPrice,images,stock,category |
 | 地址 | GET/POST/PATCH /mini/addresses | 收货人、电话、地区、详细地址、默认标记 |
 | 活动券 | GET /mini/coupons/templates | 类型、门槛、件数、适用SKU、折扣上限、发放时段、人群资格 |
@@ -37,15 +38,17 @@
 | 排行 | GET /mini/promotion/ranking | 统计周期、排名、奖励规则 |
 | 推广码 | POST /mini/promotion/code | 服务端生成真实小程序码，不信任客户端推广归属 |
 | 品牌配置 | GET /mini/brand | 视频号finderUserName、公众号二维码、客服、社群 |
+| 页面内容 | GET /mini/content、GET /mini/content/:key | 后台维护的导航、规则、页面文案及图片地址 |
+| 公开素材 | GET /mini-assets/** | Java 服务发布的业务图片和图标，支持 CDN/路径替换 |
 
 ## 微信接入位置
 
 - 支付按钮在 `pages/order-detail/index.vue`。接入 `uni.requestPayment` 后，无论成功或取消，都向服务端查询实际订单状态；前端不直接把订单改为已付。
 - 红包领取在 `pages/redpacket/index.vue`。依据商户实际权限选择确认收款或授权免确认模式，不使用支付按钮模拟转账。
-- 扫码在 `pages/scan/index.vue`，当前识别到活动码只提示未接入；替换为服务端抽奖接口后展示返回结果。
+- 扫码在 `pages/scan/index.vue`，API 模式把活动码提交到服务端抽奖接口；结果以服务端返回为准，未配置微信资金能力时不显示伪造到账。
 - 核销在 `pages/verification/index.vue`，线上必须以服务端用户角色、门店范围、奖品资格为准。
 - 公众号关注事件在公众号服务端接收并与小程序身份关联；视频号打开主页API不返回关注状态，前端不会因点击或返回自动发券。
-- 门店与客服二维码由服务端配置实际图片/小程序码，替换当前清楚标注的占位图。
+- 门店与客服二维码由服务端配置实际图片/小程序码，替换当前清楚标注的占位图；前端 API 模式下业务图片和图标均不直接读取本地演示路径。
 
 ## 需确认的运营配置
 

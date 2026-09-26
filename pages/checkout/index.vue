@@ -1,7 +1,7 @@
 <template>
   <PageShell title="确认订单" footer>
     <view v-if="product" class="section">
-      <button class="checkout-address" @click="go('addresses', { select: '1' })">
+      <button class="checkout-address" @click="openAddressSelect">
         <AppIcon name="pin" tone="gold" :size="36" />
         <view class="grow column">
           <text class="strong">
@@ -31,7 +31,7 @@
           <text class="muted">运费</text>
           <text class="amount">¥{{ money(quote.shipping, true) }}</text>
         </view>
-        <button class="summary-row" @click="go('coupons', { mode: 'select' })">
+        <button class="summary-row" @click="openCouponSelect">
           <text>优惠券</text>
           <view class="row">
             <text class="muted">{{ coupon ? coupon.description : '选择优惠券' }}</text>
@@ -66,22 +66,25 @@
   </PageShell>
 </template>
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import PriceTag from '../../components/PriceTag.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, submitOrder } from '../../services/store.js'
+import { state, submitOrder, quoteCheckout, refreshDomain } from '../../services/store.js'
 import { getProduct } from '../../services/catalog.js'
 import { quoteOrder, money } from '../../services/pricing.js'
 import { go, confirm, toast } from '../../services/navigation.js'
+import { isApiMode } from '../../services/config.js'
 const draft = computed(() => state.checkout),
   product = computed(() => getProduct(draft.value.productId)),
   coupon = computed(() => state.coupons.find((c) => c.id === draft.value.couponId)),
   address = computed(() => state.addresses.find((a) => a.id === draft.value.addressId)),
-  submitting = ref(false)
+  submitting = ref(false),
+  serverQuote = ref(null)
 const quote = computed(() =>
-  product.value
+  isApiMode() ? serverQuote.value || { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: '正在计算订单金额' } : product.value
     ? quoteOrder(
         [
           {
@@ -94,13 +97,41 @@ const quote = computed(() =>
       )
     : { subtotal: 0, shipping: 0, discount: 0, total: 0 },
 )
+let quoteRevision = 0
+async function updateQuote() {
+  if (!isApiMode()) return
+  const current = ++quoteRevision
+  serverQuote.value = null
+  if (!address.value || !product.value) return
+  try {
+    const result = await quoteCheckout()
+    if (current === quoteRevision) serverQuote.value = result
+  } catch (error) {
+    if (current === quoteRevision) serverQuote.value = { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: error.message }
+  }
+}
+watch(() => [draft.value.productId, draft.value.quantity, draft.value.couponId, draft.value.addressId], updateQuote, { immediate: true })
+onShow(async () => {
+  if (!isApiMode()) return
+  try {
+    await Promise.all([refreshDomain('addresses'), refreshDomain('coupons')])
+    await updateQuote()
+  } catch (error) { toast(error.message) }
+})
 const maskPhone = (p) => (p ? `${p.slice(0, 3)}****${p.slice(-4)}` : '')
+// 通过具名方法统一页面跳转，保证地址与优惠券入口复用全局路由兜底逻辑。
+function openAddressSelect() {
+  go('addresses', { select: '1' })
+}
+function openCouponSelect() {
+  go('coupons', { mode: 'select' })
+}
 async function submit() {
   if (submitting.value) return
   if (!address.value) return toast('请先填写收货地址')
   submitting.value = true
   try {
-    if (
+    if (!isApiMode() &&
       !(await confirm(
         '创建演示订单',
         '当前为前端演示，不会扣款。确认后创建本地订单，可继续预览支付和订单状态。',
@@ -108,7 +139,9 @@ async function submit() {
       ))
     )
       return
-    const order = submitOrder()
+    if (isApiMode() && (!serverQuote.value || serverQuote.value.reason))
+      throw new Error(serverQuote.value?.reason || '请等待服务端计算订单金额')
+    const order = await submitOrder()
     go('order-detail', { id: order.id })
   } catch (e) {
     toast(e.message)

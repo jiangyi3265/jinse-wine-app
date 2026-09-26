@@ -38,15 +38,18 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import ProductCard from '../../components/ProductCard.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { products } from '../../services/catalog.js'
+import { products, loadCatalog } from '../../services/catalog.js'
+import { toast } from '../../services/navigation.js'
 const keyword = ref(''),
   category = ref('全部'),
   sort = ref('default'),
-  categories = ['全部', '酱香', '浓香', '礼盒']
+  categories = computed(() => ['全部', ...new Set(products.map((item) => item.category).filter(Boolean))])
+onShow(() => loadCatalog().catch((error) => toast(error.message)))
 const filtered = computed(() => {
   const items = products.filter(
     (p) =>

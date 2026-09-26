@@ -46,6 +46,7 @@ backups/
 # Environment files and credentials (only explicitly named examples are public)
 .env
 .env.*
+!.env.example
 *.env
 .npmrc
 .netrc

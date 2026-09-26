@@ -68,7 +68,7 @@
         </view>
         <view class="notice section-space">
           <AppIcon name="info" :size="19" />
-          <text>当前订单为前端演示订单，未发生真实付款或发货。</text>
+          <text>{{ isApiMode() ? '订单状态以服务端查询结果为准。' : '当前订单为前端演示订单，未发生真实付款或发货。' }}</text>
         </view>
       </view>
       <view class="bottom-action">
@@ -84,12 +84,13 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import PriceTag from '../../components/PriceTag.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, setOrderStatus } from '../../services/store.js'
+import { state, setOrderStatus, payOrder, refreshOrder } from '../../services/store.js'
+import { isApiMode } from '../../services/config.js'
 import { getProduct } from '../../services/catalog.js'
 import { money } from '../../services/pricing.js'
 import {
@@ -106,12 +107,19 @@ const id = ref(''),
 onLoad((q) => {
   id.value = q.id || ''
 })
+onShow(() => {
+  if (isApiMode() && id.value) refreshOrder(id.value).catch((error) => toast(error.message))
+})
 const order = computed(() => state.orders.find((o) => o.id === id.value)),
   product = computed(() => getProduct(order.value?.productId))
 async function pay() {
   if (busy.value) return
   busy.value = true
   try {
+    if (isApiMode()) {
+      await payOrder(id.value)
+      return
+    }
     if (
       await confirm(
         '预览支付成功',
@@ -119,7 +127,7 @@ async function pay() {
         '预览成功',
       )
     )
-      setOrderStatus(id.value, 'shipping')
+      await setOrderStatus(id.value, 'shipping')
   } catch (e) {
     toast(e.message)
   } finally {

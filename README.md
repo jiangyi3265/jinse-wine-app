@@ -6,7 +6,7 @@
 
 依据已确认的 V2/V3 UI 设计实现 28 个页面，覆盖商城搜索与分类、商品详情、结算、订单、优惠券、积分兑换、扫码奖品、现金红包状态、门店与兑奖码、会员资料、VIP 社群、推广海报、团队排行和门店核销等交互。
 
-当前默认运行于 `demo` 模式：用户、商品、订单、券、积分、奖品等数据存储在本机；支付、红包到账、兑换和核销均为明确标注的演示。真实登录、库存、支付、发券、红包及后台接口尚未接入；切换 `mode` 不会自动获得服务端功能。服务约定见 [API-CONTRACT.md](API-CONTRACT.md)。
+小程序默认运行于 `api` 模式：商品、门店、页面内容、图片、图标、登录、地址、券、结算、订单、支付查询、积分、奖品及核销均从服务端读取；页面结构仍随小程序包发布，运营数据与展示素材可在后台配置。Node 单测会自动使用 `demo` 模式。需要本地演示时显式设置 `VITE_MINI_MODE=demo`，需要联调时可复制 `.env.example` 为 `.env.local` 并配置后端地址。支付、红包到账和抽奖结果始终以服务端查询为准，服务端未开放的能力会在页面明确提示。服务约定见 [API-CONTRACT.md](API-CONTRACT.md)。
 
 ## 技术栈
 
@@ -23,7 +23,7 @@
 | jinse-wine-admin | 管理后台 | [jinse-wine-admin](https://github.com/jiangyi3265/jinse-wine-admin) |
 | jinse-wine-app | 用户端 | [jinse-wine-app](https://github.com/jiangyi3265/jinse-wine-app) |
 
-本用户端计划通过 `jinse-wine-backend` 接入业务数据，运营配置由 `jinse-wine-admin` 承担；当前用户端独立演示，另两端的酒业专属功能仍待开发与联调。
+本用户端通过 `jinse-wine-backend` 接入业务数据，运营配置由 `jinse-wine-admin` 承担；未配置微信凭据的环境会保留演示模式，真实登录和支付仍以正式微信配置为准。
 
 ## 快速启动
 
@@ -42,9 +42,9 @@ npm run build:mp-weixin
 npm test
 ```
 
-- H5 产物：`dist/build/h5`，通过静态服务器访问。
-- 微信产物：`dist/build/mp-weixin`，在微信开发者工具中导入，并使用自己具有权限的小程序 AppID（`manifest.json`）。AppID 是公开标识，AppSecret 不得写入前端。
-- 微信开发模式：`npm run dev:mp-weixin`，输出 `dist/dev/mp-weixin`。
+- H5 产物：`unpackage/dist/build/h5`，通过静态服务器访问。
+- 微信产物：`unpackage/dist/build/mp-weixin`，在微信开发者工具中导入，并使用自己具有权限的小程序 AppID（`manifest.json`）。AppID 是公开标识，AppSecret 不得写入前端。
+- 微信开发模式：`npm run dev:mp-weixin`，输出 `unpackage/dist/dev/mp-weixin`。
 - HBuilderX 可直接打开项目；其运行产物位于 `unpackage/`。
 
 uni-app 打包不等同于微信 WXSS 校验。本机安装微信开发者工具后，将 `WCSC_PATH` 设置为工具内 `wcsc.exe` 的路径，再运行 `npm run check:wxss`；HBuilderX 产物可运行 `npm run check:wxss -- unpackage/dist/dev/mp-weixin`。
@@ -72,7 +72,7 @@ pages.json         页面路由
 
 ## 简历描述示例
 
-基于 uni-app 与 Vue 3 实现金色酒业微信小程序及 H5 共 28 个页面，完成商城结算、优惠券、积分兑换、奖品核销和推广海报等前端演示流程。以整数分处理优惠计价，建立状态防重测试及 WXSS 平台兼容检查，为后续后端联调保留接口边界。
+基于 uni-app 与 Vue 3 实现金色酒业微信小程序及 H5 共 28 个页面，接入商城目录、会员地址、优惠券、服务端报价和订单状态，并保留无凭据环境的演示流程。以整数分处理优惠计价，建立状态防重测试及 WXSS 平台兼容检查。
 
 ## 本地文件管理
 

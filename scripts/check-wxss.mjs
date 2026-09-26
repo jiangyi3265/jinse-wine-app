@@ -21,7 +21,7 @@ function collectWxss(directory) {
 
 let checked = 0
 let failed = 0
-for (const directory of args.length ? args : ['dist/build/mp-weixin']) {
+for (const directory of args.length ? args : ['unpackage/dist/build/mp-weixin']) {
   const root = resolve(directory)
   if (!existsSync(join(root, 'app.wxss'))) {
     console.error(`Missing app.wxss in ${root}; build the mini program first.`)

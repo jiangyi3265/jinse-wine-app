@@ -18,8 +18,8 @@ npm run build:mp-weixin
 npm test
 ```
 
-- H5生产目录：`dist/build/h5`，需由静态Web服务器提供，不要直接双击index.html。
-- 微信小程序目录：`dist/build/mp-weixin`。在微信开发者工具中导入此目录，小程序AppID使用 `manifest.json` 中的配置。
+- H5生产目录：`unpackage/dist/build/h5`，需由静态Web服务器提供，不要直接双击index.html。
+- 微信小程序目录：`unpackage/dist/build/mp-weixin`。在微信开发者工具中导入此目录，小程序AppID使用 `manifest.json` 中的配置。
 - HBuilderX也可以打开本项目；当前使用Vue 3模式。
 - 已用本机Node.js 24验证，所有DCloud依赖锁定同一版本，升级时请保持版本一致。
 

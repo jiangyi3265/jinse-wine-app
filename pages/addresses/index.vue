@@ -32,16 +32,17 @@
 </template>
 <script setup>
 import { ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, persist } from '../../services/store.js'
-import { go, back } from '../../services/navigation.js'
+import { state, persist, refreshDomain } from '../../services/store.js'
+import { go, back, toast } from '../../services/navigation.js'
 const selecting = ref(false)
 onLoad((q) => {
   selecting.value = q.select === '1'
 })
+onShow(() => refreshDomain('addresses').catch((error) => toast(error.message)))
 function select(address) {
   if (!selecting.value) return go('address-edit', { id: address.id })
   state.checkout.addressId = address.id

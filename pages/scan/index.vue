@@ -1,7 +1,7 @@
 <template>
   <PageShell title="扫码有礼" dark left :back-button="false" active="scan">
     <view class="scan-hero">
-      <image src="/static/design/detail-scene-clean.jpg" mode="aspectFill" />
+      <image :src="assetUrl('/static/design/detail-scene-clean.jpg', 'brand.scan')" mode="aspectFill" />
       <view class="scan-hero-copy">
         <text class="hero-title block">开启一份好礼</text>
         <text class="hero-subtitle block">扫描瓶身活动码参与抽奖</text>
@@ -24,7 +24,7 @@
           <text class="small muted">随机金额，微信到账</text>
         </button>
         <button class="prize-preview" @click="go('awards')">
-          <image src="/static/design/cup.jpg" mode="aspectFill" />
+          <image :src="assetUrl('/static/design/cup.jpg', 'brand.cup')" mode="aspectFill" />
           <text class="strong">实物礼品</text>
           <text class="small muted">品鉴杯等精美礼品</text>
         </button>
@@ -45,7 +45,8 @@
 <script setup>
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
-import { previewDraw } from '../../services/store.js'
+import { previewDraw, drawCode } from '../../services/store.js'
+import { isApiMode, assetUrl } from '../../services/config.js'
 import { go, toast, confirm } from '../../services/navigation.js'
 async function demo() {
   if (
@@ -69,8 +70,25 @@ async function demo() {
     },
   })
 }
+async function handleCode(code) {
+  if (!isApiMode()) {
+    const reward = previewDraw(code)
+    if (code === 'cash') go('redpacket', { id: reward.rewardId })
+    else { toast('演示奖励已发放'); go(code === 'points' ? 'points' : code === 'coupon' ? 'my-coupons' : 'awards') }
+    return
+  }
+  try {
+    const reward = await drawCode(code)
+    if (reward?.kind === 'cash') go('redpacket', { id: reward.id })
+    else if (reward?.kind === 'goods') go('awards')
+    else if (reward?.kind === 'coupon') go('my-coupons')
+    else if (reward?.kind === 'points') go('points')
+    else toast(reward?.message || '活动码已提交，结果以服务端为准')
+  } catch (error) { toast(error.message) }
+}
 function scan() {
   // #ifdef H5
+  if (isApiMode()) return toast('请在微信小程序中使用扫码活动')
   demo()
   // #endif
   // #ifdef MP-WEIXIN
@@ -80,7 +98,7 @@ function scan() {
       if (r.tapIndex === 1) return demo()
       uni.scanCode({
         onlyFromCamera: true,
-        success: () => toast('已识别活动码，活动服务尚未接入'),
+        success: (result) => handleCode(result.result),
         fail: (e) => {
           if (!e.errMsg?.includes('cancel')) toast('无法扫码，请检查相机权限')
         },

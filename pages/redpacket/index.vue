@@ -33,7 +33,7 @@
             </text>
           </view>
           <text class="muted small">
-            {{ received ? '演示到账状态，未发生真实转账' : '请及时领取，到账以微信记录为准' }}
+            {{ received ? (isApiMode() ? '到账状态以服务端和微信记录为准' : '演示到账状态，未发生真实转账') : '请及时领取，到账以微信记录为准' }}
           </text>
         </view>
         <view class="packet-actions">
@@ -66,11 +66,12 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, receiveRedPacket } from '../../services/store.js'
+import { state, receiveRedPacket, refreshRedPacket } from '../../services/store.js'
+import { isApiMode } from '../../services/config.js'
 import { go, contact, confirm, toast } from '../../services/navigation.js'
 import { money } from '../../services/pricing.js'
 const id = ref('redpack-1'),
@@ -78,21 +79,22 @@ const id = ref('redpack-1'),
 onLoad((q) => {
   id.value = q.id || 'redpack-1'
 })
+onShow(() => {
+  if (isApiMode() && id.value) refreshRedPacket(id.value).catch((error) => toast(error.message))
+})
 const packet = computed(() => state.redPackets.find((p) => p.id === id.value)),
   received = computed(() => packet.value?.status === 'received')
 async function receive() {
   if (busy.value || received.value) return
   busy.value = true
   try {
-    if (
+    if (!isApiMode() &&
       !(await confirm(
         '预览红包到账',
         '当前为前端演示，本次仅预览到账页面，不会向微信零钱转入资金。实际到账需接入微信商家转账。',
         '预览到账',
-      ))
-    )
-      return
-    receiveRedPacket(id.value)
+      ))) return
+    await receiveRedPacket(id.value)
   } catch (e) {
     toast(e.message)
   } finally {

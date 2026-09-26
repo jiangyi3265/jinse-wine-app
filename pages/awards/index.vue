@@ -28,7 +28,7 @@
             <QrCode />
             <text class="strong">请向门店核销员出示</text>
             <text class="muted small">兑换码仅用于奖品核销</text>
-            <text class="small muted">演示码：{{ award.code }}</text>
+            <text class="small muted">兑换码：{{ award.code }}</text>
           </view>
         </view>
         <view v-else class="award-small">
@@ -59,14 +59,16 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import QrCode from '../../components/QrCode.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state } from '../../services/store.js'
-import { go } from '../../services/navigation.js'
+import { state, refreshDomain } from '../../services/store.js'
+import { go, toast } from '../../services/navigation.js'
 const tab = ref('待兑换'),
   expanded = ref('')
+onShow(() => refreshDomain('awards').catch((error) => toast(error.message)))
 const filtered = computed(() =>
   state.awards.filter(
     (a) => tab.value === '全部' || a.status === (tab.value === '待兑换' ? 'pending' : 'redeemed'),
