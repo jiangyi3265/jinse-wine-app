@@ -1,4 +1,4 @@
-import { readdirSync, existsSync } from 'node:fs'
+import { readdirSync, existsSync, readFileSync } from 'node:fs'
 import { resolve, relative, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -7,9 +7,43 @@ const args = process.argv.slice(2)
 const compilerOption = args.indexOf('--compiler')
 const compiler = compilerOption >= 0 ? args.splice(compilerOption, 2)[1] : process.env.WCSC_PATH
 
-if (!compiler || !existsSync(compiler)) {
-  console.error('Provide the WeChat wcsc executable with --compiler <path> or WCSC_PATH.')
-  process.exit(1)
+const hasCompiler = compiler && existsSync(compiler)
+
+function staticCheck(content) {
+  const errors = []
+  let braceDepth = 0
+  let quote = ''
+  let escaped = false
+  for (const character of content) {
+    if (quote) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === quote) quote = ''
+      continue
+    }
+    if (character === '"' || character === "'") quote = character
+    else if (character === '{') braceDepth++
+    else if (character === '}') braceDepth--
+    if (braceDepth < 0) {
+      errors.push('closing brace appears before an opening brace')
+      break
+    }
+  }
+  if (quote) errors.push('unterminated string literal')
+  if (braceDepth !== 0) errors.push(`unbalanced braces (${braceDepth > 0 ? 'missing closing' : 'extra closing'})`)
+  const unsupported = [
+    /:focus-within\b/,
+    /:has\(/,
+    // WeChat's native button reset pattern uses `button::after` and is
+    // supported by WXSS. Keep checking the browser-only text pseudo-elements
+    // and `::before`, but do not reject the valid button border reset.
+    /::(?:before|first-letter|first-line)\b/,
+    /@(?:supports|layer)\b/,
+  ]
+  if (unsupported.some((pattern) => pattern.test(content))) {
+    errors.push('contains browser-only selector or at-rule')
+  }
+  return errors
 }
 
 function collectWxss(directory) {
@@ -21,6 +55,9 @@ function collectWxss(directory) {
 
 let checked = 0
 let failed = 0
+if (!hasCompiler) {
+  console.warn('WeChat wcsc not found; running static WXSS checks. Install the official compiler for compiler-level validation.')
+}
 for (const directory of args.length ? args : ['unpackage/dist/build/mp-weixin']) {
   const root = resolve(directory)
   if (!existsSync(join(root, 'app.wxss'))) {
@@ -30,6 +67,17 @@ for (const directory of args.length ? args : ['unpackage/dist/build/mp-weixin'])
   }
   for (const path of collectWxss(root)) {
     const file = relative(root, path).replaceAll('\\', '/')
+    checked++
+    if (!hasCompiler) {
+      const errors = staticCheck(readFileSync(path, 'utf8'))
+      if (errors.length) {
+        failed++
+        console.error(`FAIL ${directory}/${file}\n${errors.join('; ')}`)
+      } else {
+        console.log(`PASS ${directory}/${file} (static)`)
+      }
+      continue
+    }
     const result = spawnSync(resolve(compiler), ['-lc', file], {
       cwd: root,
       encoding: 'utf8',
@@ -37,7 +85,6 @@ for (const directory of args.length ? args : ['unpackage/dist/build/mp-weixin'])
       timeout: 30000,
       maxBuffer: 8 * 1024 * 1024,
     })
-    checked++
     if (result.error || result.status !== 0) {
       failed++
       console.error(

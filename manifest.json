@@ -59,9 +59,17 @@
     "quickapp" : {},
     /* 小程序特有相关 */
     "mp-weixin" : {
-        "appid" : "wxc0bf4aba46ccdfe9",
+        "appid" : "wx7e0ac06d1c28077a",
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "用于定位当前位置并计算到门店的距离"
+            }
+        },
+        "requiredPrivateInfos" : [
+            "getLocation"
+        ],
         "setting" : {
-            "urlCheck" : false
+            "urlCheck" : true
         },
         "usingComponents" : true
     },

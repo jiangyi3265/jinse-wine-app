@@ -4,9 +4,9 @@
 
 ## 项目简介
 
-依据已确认的 V2/V3 UI 设计实现 28 个页面，覆盖商城搜索与分类、商品详情、结算、订单、优惠券、积分兑换、扫码奖品、现金红包状态、门店与兑奖码、会员资料、VIP 社群、推广海报、团队排行和门店核销等交互。
+依据已确认的 V2/V3 UI 设计实现商城搜索与分类、商品详情、购物车、结算、订单、物流售后、优惠券、积分兑换、扫码奖品、现金红包状态、门店与兑奖码、会员资料、VIP 社群、推广海报、团队排行和门店核销等交互。
 
-小程序默认运行于 `api` 模式：商品、门店、页面内容、图片、图标、登录、地址、券、结算、订单、支付查询、积分、奖品及核销均从服务端读取；页面结构仍随小程序包发布，运营数据与展示素材可在后台配置。Node 单测会自动使用 `demo` 模式。需要本地演示时显式设置 `VITE_MINI_MODE=demo`，需要联调时可复制 `.env.example` 为 `.env.local` 并配置后端地址。支付、红包到账和抽奖结果始终以服务端查询为准，服务端未开放的能力会在页面明确提示。服务约定见 [API-CONTRACT.md](API-CONTRACT.md)。
+小程序默认运行于 `api` 模式：商品、门店、页面内容、图片、图标、登录、地址、券、结算、订单、支付查询、积分、奖品及核销均从服务端读取；页面结构仍随小程序包发布，运营数据与展示素材可在后台配置。Node 单测会自动使用 `demo` 模式。本地离线预览可在开发服务中显式设置 `VITE_MINI_MODE=demo`，构建命令拒绝演示模式；联调可复制 `.env.example` 为 `.env.local` 并配置后端地址。支付、红包到账和抽奖结果始终以服务端查询为准，服务端未开放的能力会在页面明确提示。服务约定见 [API-CONTRACT.md](API-CONTRACT.md)。
 
 ## 技术栈
 
@@ -34,20 +34,28 @@ npm ci
 npm run dev:h5
 ```
 
-打开 `http://127.0.0.1:5173/`。H5 演示不依赖数据库和后端，页面使用本地示例数据。
-
+打开 `http://127.0.0.1:5173/`。本地联调时使用后端真实目录、会员会话和业务数据；若只需要离线查看画面，显式设置 `VITE_MINI_MODE=demo` 后再启动。
 ```bash
 npm run build:h5
 npm run build:mp-weixin
 npm test
 ```
 
+正式构建前，先将 `VITE_MINI_API_BASE_URL` 配置为生产 API 地址；微信小程序必须使用微信公众平台已配置为 request 合法域名的 HTTPS 地址。未配置时正式构建会停止，避免把开发机地址或 H5 开发代理发布到线上。PowerShell 示例：
+
+```powershell
+$env:VITE_MINI_API_BASE_URL = 'https://jiuyekl.oksja.cn'
+$env:VITE_MINI_LOTTERY_QR_PREFIX = 'https://jiuyekl.oksja.cn/qr/lottery/'
+npm run build:mp-weixin
+```
+
 - H5 产物：`unpackage/dist/build/h5`，通过静态服务器访问。
 - 微信产物：`unpackage/dist/build/mp-weixin`，在微信开发者工具中导入，并使用自己具有权限的小程序 AppID（`manifest.json`）。AppID 是公开标识，AppSecret 不得写入前端。
+- 本机 `.env.production` 已设置上述公开域名；交付示例见 `.env.example`。微信公众平台须将 `https://jiuyekl.oksja.cn` 配为 request/uploadFile/downloadFile 合法域名。当前域名证书与代理尚未通过正式核验，构建成功不代表可发布。
 - 微信开发模式：`npm run dev:mp-weixin`，输出 `unpackage/dist/dev/mp-weixin`。
 - HBuilderX 可直接打开项目；其运行产物位于 `unpackage/`。
 
-uni-app 打包不等同于微信 WXSS 校验。本机安装微信开发者工具后，将 `WCSC_PATH` 设置为工具内 `wcsc.exe` 的路径，再运行 `npm run check:wxss`；HBuilderX 产物可运行 `npm run check:wxss -- unpackage/dist/dev/mp-weixin`。
+uni-app 打包不等同于微信 WXSS 校验。本机安装微信开发者工具后，将 `WCSC_PATH` 设置为工具内 `wcsc.exe` 的路径，再运行 `npm run check:wxss`，脚本会执行官方编译器检查；未安装工具时脚本会对生成的 WXSS 执行静态语法和浏览器专属选择器检查，并明确标记为 static。HBuilderX 产物可运行 `npm run check:wxss -- unpackage/dist/dev/mp-weixin`。
 
 ## 项目结构
 

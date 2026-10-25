@@ -11,7 +11,20 @@
         {{ item }}
       </button>
     </view>
-    <view class="coupon-list">
+    <view v-if="loading" class="coupon-list coupon-loading" aria-label="正在加载优惠券">
+      <view v-for="item in 2" :key="item" class="coupon-loading-card">
+        <view class="coupon-loading-value" />
+        <view class="coupon-loading-body">
+          <view class="coupon-loading-line coupon-loading-line--title" />
+          <view class="coupon-loading-line coupon-loading-line--description" />
+          <view class="coupon-loading-line coupon-loading-line--action" />
+        </view>
+      </view>
+    </view>
+    <view v-else-if="loadError" class="coupon-list">
+      <EmptyState title="优惠券暂时无法加载" :description="loadError" button="重新加载" icon="coupon" @action="loadCoupons" />
+    </view>
+    <view v-else class="coupon-list">
       <CouponCard
         v-for="coupon in filtered"
         :key="coupon.id"
@@ -58,8 +71,8 @@ import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import CouponCard from '../../components/CouponCard.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { couponTemplates, getProduct, loadCatalog } from '../../services/catalog.js'
-import { state, claimCoupon, persist } from '../../services/store.js'
+import { couponTemplates, getProduct, loadCouponCatalog, loadProductSkus } from '../../services/catalog.js'
+import { state, claimCoupon, couponClaimLimitReached, loadCart, persist } from '../../services/store.js'
 import { couponEligibility } from '../../services/pricing.js'
 import { go, back, toast } from '../../services/navigation.js'
 import { onShow } from '@dcloudio/uni-app'
@@ -68,31 +81,57 @@ import { refreshDomain } from '../../services/store.js'
 const props = defineProps({ mine: { type: Boolean, default: true } }),
   mode = ref(''),
   tab = ref('全部'),
-  mine = ref(props.mine)
+  source = ref('product'),
+  selectedSkuPrice = ref(null),
+  mine = ref(props.mine),
+  loading = ref(true),
+  loadError = ref(''),
+  claiming = ref('')
 onLoad((q) => {
   mode.value = q.mode || ''
+  source.value = q.source === 'cart' ? 'cart' : 'product'
   mine.value = q.mine === '1' || props.mine
-  tab.value = mine.value ? '未使用' : '全部'
+  tab.value = mode.value === 'select' ? '全部' : mine.value ? '未使用' : '全部'
 })
-onShow(async () => {
-  try { await loadCatalog(); if (isApiMode()) await refreshDomain('coupons') }
-  catch (error) { toast(error.message) }
-})
+async function loadCoupons() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    await loadCouponCatalog(selecting.value && source.value !== 'cart')
+    if (selecting.value && source.value === 'cart') await loadCart()
+    if (selecting.value && source.value === 'product' && state.checkout.skuCode) {
+      const skus = await loadProductSkus(state.checkout.productId)
+      const selected = skus.find(item => item.skuCode === state.checkout.skuCode)
+      if (!selected) throw new Error('商品规格已变化，请返回商品页重新选择')
+      selectedSkuPrice.value = selected.price
+    } else selectedSkuPrice.value = null
+    if (isApiMode()) await refreshDomain('coupons')
+  }
+  catch (error) { loadError.value = error.message || '优惠券信息暂时无法获取，请稍后重试' }
+  finally { loading.value = false }
+}
+onShow(loadCoupons)
 const selecting = computed(() => mode.value === 'select'),
   tabs = computed(() =>
-    mine.value
-      ? ['未使用', '已使用', '已过期']
-      : selecting.value
-        ? ['全部', '可用', '不可用']
+    selecting.value
+      ? ['全部', '可用', '不可用']
+      : mine.value
+        ? ['未使用', '已使用', '已过期']
         : ['全部', '节日活动', '社群专享'],
   )
 const lines = computed(() => {
+  if (selecting.value && source.value === 'cart')
+    return (state.cart || []).map(item => ({
+      productId: item.productId,
+      price: Number(item.price),
+      quantity: Number(item.quantity),
+    }))
   const p = getProduct(state.checkout.productId)
   return p
     ? [
         {
           productId: p.id,
-          price: p.price,
+          price: selectedSkuPrice.value ?? p.price,
           quantity: state.checkout.quantity,
         },
       ]
@@ -128,14 +167,14 @@ function label(c) {
         : tab.value === '已使用'
           ? '已使用'
           : '已过期'
-  return state.claimedTemplates.includes(c.id) ? '已领取' : '领取'
+  return claiming.value === c.id ? '领取中' : couponClaimLimitReached(c.id) ? '已领取' : '领取'
 }
 function disabled(c) {
   return selecting.value
     ? !!eligibility(c)
     : mine.value
       ? tab.value !== '未使用' || c.status === 'locked'
-      : state.claimedTemplates.includes(c.id)
+      : !!claiming.value || couponClaimLimitReached(c.id)
 }
 function choose(c) {
   state.checkout.couponId = c?.id || null
@@ -145,10 +184,13 @@ function choose(c) {
 async function handle(c) {
   if (selecting.value) return choose(c)
   if (mine.value) return go('shop')
+  if (claiming.value) return
+  claiming.value = c.id
   try {
     await claimCoupon(c.id)
     toast('领取成功，可在我的优惠券中查看')
   } catch (error) { toast(error.message) }
+  finally { claiming.value = '' }
 }
 function rules(c) {
   go('rules', { type: 'coupon', id: c.templateId || c.id })

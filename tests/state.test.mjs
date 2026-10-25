@@ -43,6 +43,20 @@ test('points and stock decrement with one entitlement; insufficient balance leav
   assert.equal(JSON.stringify(state), before)
   state.points = points - 200
 })
+test('unlimited demo exchange stock stays available after redemption', () => {
+  const points = state.points
+  const stock = state.exchangeStock.cup
+  state.points = 1000
+  state.exchangeStock.cup = -1
+  exchangeReward('cup')
+  assert.equal(state.exchangeStock.cup, -1)
+  exchangeReward('cup')
+  assert.equal(state.exchangeStock.cup, -1)
+  state.exchangeStock.cup = undefined
+  assert.throws(() => exchangeReward('cup'), /已兑完/)
+  state.points = points
+  state.exchangeStock.cup = stock
+})
 test('checkout submission idempotent and coupon reserved; cancel restores availability', () => {
   prepareCheckout('classic')
   const first = submitOrder(),

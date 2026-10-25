@@ -53,11 +53,19 @@ export function callStore(store) {
     fail: () => toast('未能拨打，请稍后重试'),
   })
 }
+export function hasStoreCoordinates(store) {
+  if (!store || ![store.latitude, store.longitude].every((value) =>
+    (typeof value === 'number' || typeof value === 'string') && String(value).trim() !== '')) return false
+  const latitude = Number(store.latitude), longitude = Number(store.longitude)
+  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+    && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+    && (latitude !== 0 || longitude !== 0)
+}
 export function locateStore(store) {
-  if (store.latitude == null || store.longitude == null) return toast('门店导航位置尚未配置')
+  if (!hasStoreCoordinates(store)) return toast('门店导航位置尚未配置')
   uni.openLocation({
-    latitude: store.latitude,
-    longitude: store.longitude,
+    latitude: Number(store.latitude),
+    longitude: Number(store.longitude),
     name: store.name,
     address: store.address,
     fail: () => toast('无法打开地图，请检查定位权限'),
@@ -71,8 +79,23 @@ export function dateLabel(time) {
 }
 export const statusLabels = {
   pending: '待付款',
-  shipping: '待发货',
+  paid: '待发货',
+  shipping: '待收货',
   receiving: '待收货',
   complete: '已完成',
+  refunded: '已退款',
   cancelled: '已取消',
+}
+export function deliveryStatusLabel(status) {
+  return ({ pending: '待发货', shipped: '已发货，待揽收', awaiting_collect: '已发货，待揽收',
+    collected: '已揽收', in_transit: '运输中', delivering: '运输中', out_for_delivery: '派送中',
+    awaiting_pickup: '到达驿站待取件', agent_signed: '已代签收，请核对取件', signed: '已签收，待确认收货', delivered: '已送达，待确认收货',
+    returning: '退回中', returned: '已退回', refused: '已拒收', exception: '物流异常', cancelled: '运单已取消',
+  })[status] || '物流待更新'
+}
+export function orderStatusLabel(order, deliveryStatus = order?.deliveryStatus) {
+  if (!order) return '状态待确认'
+  if (order.status === 'paid') return order.fulfillmentMode === 'pickup' ? '待到店自提' : '待发货'
+  if (['shipping', 'receiving'].includes(order.status) && deliveryStatus) return deliveryStatusLabel(deliveryStatus)
+  return statusLabels[order.status] || '状态待确认'
 }

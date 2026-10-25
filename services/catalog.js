@@ -143,13 +143,13 @@ const demoStores = [
     name: '金色酒业体验店',
     city: '贵港',
     district: '港北区',
-    address: '贵港市港北区 示例门店地址',
-    distance: 1.2,
+    address: '贵港市港北区金港大道 888 号金色酒业体验店',
+    distance: '—',
     hours: '09:00 - 21:00',
     image: '/static/design/product-classic.jpg',
-    phone: '',
-    latitude: null,
-    longitude: null,
+    phone: '13800002688',
+    latitude: 23.0965,
+    longitude: 109.6086,
     serviceQr: '',
     groupQr: '',
   },
@@ -158,13 +158,13 @@ const demoStores = [
     name: '金色酒业合作门店',
     city: '贵港',
     district: '港南区',
-    address: '贵港市港南区 示例门店地址',
-    distance: 3.6,
+    address: '贵港市港南区江南大道 188 号金色酒业合作门店',
+    distance: '—',
     hours: '09:00 - 21:00',
     image: '/static/design/product-classic.jpg',
-    phone: '',
-    latitude: null,
-    longitude: null,
+    phone: '13800002689',
+    latitude: 23.0668,
+    longitude: 109.5945,
     serviceQr: '',
     groupQr: '',
   },
@@ -187,6 +187,15 @@ export const homeHeroSlides = reactive([])
 
 export const getProduct = (id) => products.find((product) => product.id === id)
 export const getCouponTemplate = (id) => couponTemplates.find((coupon) => coupon.id === id)
+export async function loadProductSkus(code) {
+  if (!isApiMode() || !code) return []
+  const rows = await get(`/mini/products/${encodeURIComponent(code)}/skus`)
+  return (rows || []).map((item) => ({
+    ...item,
+    price: Number(item.priceCent || 0),
+    stock: Number(item.stock || 0),
+  }))
+}
 
 const replace = (target, items) => target.splice(0, target.length, ...items)
 const normalizeMedia = (item) => ({
@@ -238,46 +247,130 @@ const normalizeBrand = (brand = {}, content = {}) => {
 
 // 目录数组保持同一个引用，已打开的页面会随服务端数据刷新。
 let catalogTask
+const catalogRequest = async () => {
+  return Promise.all([
+    get('/mini/products'), get('/mini/stores'), get('/mini/coupons/templates'),
+    get('/mini/exchanges'),
+  ])
+}
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+
+let presentationTask
+function applyPresentation(brandData, contentData, channelData) {
+  const contentItems = (contentData || []).map((item) => ({ ...item }))
+  const content = contentItems.reduce((map, item) => {
+    map[item.key] = item
+    return map
+  }, {})
+  const publicChannels = channelData || {}
+  const channelQrExpired = publicChannels['wechat.work.groupQrExpired'] === 'true'
+  const channelGroupQr = channelQrExpired ? '' : publicChannels['wechat.work.groupQr'] || ''
+  const brand = normalizeBrand({
+    ...(brandData || {}),
+    groupQr: channelGroupQr,
+    finderUserName: publicChannels['wechat.video.finderUserName'] || '',
+  }, content)
+  for (const item of contentItems) item.imageUrl = mediaUrl(item.imageUrl)
+  const slides = contentItems
+    .filter((item) => item.type === 'banner' && (item.key === 'home.hero' || item.key.startsWith('home.hero.')))
+    .sort((left, right) => Number(left.sort || 0) - Number(right.sort || 0) || Number(left.id || 0) - Number(right.id || 0))
+    .filter((item) => item.imageUrl)
+  replace(homeHeroSlides, slides)
+  for (const key of ['homeHeroImage', 'homeCampaignImage', 'homeVideoImage', 'videoBannerImage',
+    'campaignImage', 'groupOfferImage', 'storeHeroImage', 'mapImage', 'avatarImage',
+    'pointsImage', 'rankingImage', 'scanImage']) {
+    brand[key] = mediaUrl(brand[key])
+  }
+  brand.officialAccountQr = mediaUrl(brand.officialAccountQr)
+  brand.groupQr = mediaUrl(brand.groupQr)
+  Object.assign(config, {
+    brand,
+    content,
+    finderUserName: brand.finderUserName || '',
+    videoLiveFeedId: publicChannels['wechat.video.liveFeedId'] || '',
+    videoLiveNonceId: publicChannels['wechat.video.liveNonceId'] || '',
+    videoFeedId: publicChannels['wechat.video.feedId'] || '',
+    videoNonceId: publicChannels['wechat.video.nonceId'] || '',
+    officialAccountQr: brand.officialAccountQr || '',
+    customerServiceQr: mediaUrl(publicChannels['wechat.customer.serviceQr'] || ''),
+    groupQr: brand.groupQr || '',
+  })
+}
+
+export function loadPresentationCatalog() {
+  if (!isApiMode()) return Promise.resolve()
+  if (presentationTask) return presentationTask
+  presentationTask = (async () => {
+    const results = await Promise.allSettled([
+      get('/mini/brand'), get('/mini/content'), get('/mini/channel'),
+    ])
+    applyPresentation(...results.map(result => result.status === 'fulfilled' ? result.value : null))
+    if (results.every(result => result.status === 'rejected')) throw results[0].reason
+  })().finally(() => { presentationTask = null })
+  return presentationTask
+}
+
+export async function loadCouponCatalog(includeProducts = false) {
+  if (!isApiMode()) return
+  const [couponData, productData] = await Promise.all([
+    get('/mini/coupons/templates'),
+    includeProducts ? get('/mini/products') : Promise.resolve(null),
+  ])
+  replace(couponTemplates, (couponData || []).map(couponDisplay))
+  if (includeProducts) replace(products, (productData || []).map(normalizeMedia))
+}
+
+export async function loadProductCatalog() {
+  if (!isApiMode()) return
+  replace(products, ((await get('/mini/products')) || []).map(normalizeMedia))
+}
+
+export function loadProductShipping(code, quantity = 1, skuCode = '') {
+  return get(`/mini/products/${encodeURIComponent(code)}/shipping-quote?quantity=${quantity}&skuCode=${encodeURIComponent(skuCode)}`)
+}
+
+export async function loadStoreCatalog() {
+  if (!isApiMode()) return
+  replace(stores, ((await get('/mini/stores')) || []).map((item) =>
+    normalizeMedia({ ...item, distance: item.distance ?? '—' })))
+}
+
+export async function loadExchangeCatalog() {
+  if (!isApiMode()) return
+  replace(exchangeProducts, ((await get('/mini/exchanges')) || []).map(normalizeMedia))
+}
+
 export async function loadCatalog() {
   if (!isApiMode()) return
   if (catalogTask) return catalogTask
-  catalogTask = Promise.all([
-    get('/mini/products'), get('/mini/stores'), get('/mini/coupons/templates'),
-    get('/mini/exchanges'), get('/mini/brand'), get('/mini/content'),
-  ]).then(([productData, storeData, couponData, exchangeData, brandData, contentData]) => {
-    const contentItems = (contentData || []).map((item) => ({ ...item }))
-    const content = contentItems.reduce((map, item) => {
-      map[item.key] = item
-      return map
-    }, {})
-    const brand = normalizeBrand(brandData || {}, content)
+  catalogTask = (async () => {
+    let response
+    let error
+    // 后端刚启动或网络代理刚建立时，按退避策略重试，避免首屏短暂
+    // 网络抖动把 API 模式永久留在空目录状态。
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        response = await catalogRequest()
+        break
+      } catch (requestError) {
+        error = requestError
+        if (attempt < 4) await wait([350, 700, 1200, 2000][attempt])
+      }
+    }
+    if (!response) throw error || new Error('目录加载失败')
+    const [productData, storeData, couponData, exchangeData] = response
     replace(products, (productData || []).map(normalizeMedia))
     replace(stores, (storeData || []).map((item) => normalizeMedia({ ...item, distance: item.distance ?? '—' })))
     replace(couponTemplates, (couponData || []).map(couponDisplay))
     replace(exchangeProducts, (exchangeData || []).map(normalizeMedia))
-    for (const item of contentItems) {
-      item.imageUrl = mediaUrl(item.imageUrl)
-    }
-    // 兼容单条 home.hero 和可扩展的 home.hero.1/home.hero.2 配置。
-    const slides = contentItems
-      .filter((item) => item.type === 'banner' && (item.key === 'home.hero' || item.key.startsWith('home.hero.')))
-      .sort((left, right) => Number(left.sort || 0) - Number(right.sort || 0) || Number(left.id || 0) - Number(right.id || 0))
-      .filter((item) => item.imageUrl)
-    replace(homeHeroSlides, slides)
-    for (const key of ['homeHeroImage', 'homeCampaignImage', 'homeVideoImage', 'videoBannerImage',
-      'campaignImage', 'groupOfferImage', 'storeHeroImage', 'mapImage', 'avatarImage',
-      'pointsImage', 'rankingImage', 'scanImage']) {
-      brand[key] = mediaUrl(brand[key])
-    }
-    brand.officialAccountQr = mediaUrl(brand.officialAccountQr)
-    brand.groupQr = mediaUrl(brand.groupQr)
-    Object.assign(config, {
-      brand,
-      content,
-      finderUserName: brand.finderUserName || '',
-      officialAccountQr: brand.officialAccountQr || '',
-      groupQr: brand.groupQr || '',
-    })
-  }).finally(() => { catalogTask = null })
+    await loadPresentationCatalog().catch(() => {})
+  })().finally(() => { catalogTask = null })
   return catalogTask
+}
+
+export async function loadStoreByCode(code) {
+  if (!isApiMode()) return stores.find((store) => store.id === code) || null
+  const item = await get(`/mini/stores/${encodeURIComponent(code)}`)
+  return item ? normalizeMedia(item) : null
 }

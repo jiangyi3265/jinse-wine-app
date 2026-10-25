@@ -39,6 +39,7 @@
       </view>
     </view>
     <slot />
+    <ProfileCompletion />
     <view v-if="active" class="tab-bar">
       <button
         v-for="item in tabs"
@@ -58,6 +59,7 @@
 </template>
 <script setup>
 import AppIcon from './AppIcon.vue'
+import ProfileCompletion from './ProfileCompletion.vue'
 import { back, go } from '../services/navigation.js'
 defineProps({
   title: String,

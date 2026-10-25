@@ -1,6 +1,12 @@
 <template>
   <PageShell :title="title">
-    <view class="rules-copy">
+    <view v-if="isApiMode() && loading" class="rules-status">正在加载规则…</view>
+    <view v-else-if="isApiMode() && loadError" class="rules-status notice">
+      <text>{{ loadError }}</text>
+      <button class="text-button" @click="loadRules">重新加载</button>
+    </view>
+    <view v-else-if="isApiMode() && !content.length" class="rules-status">规则暂未配置</view>
+    <view v-else class="rules-copy">
       <template v-if="type === 'coupon' && !isApiMode()">
         <text class="section-title">{{ coupon?.name || '优惠券使用说明' }}</text>
         <text>{{ coupon?.description || '在领券中心领取优惠券，结算时选择可用优惠券抵扣。' }}</text>
@@ -26,16 +32,49 @@
 </template>
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import { getCouponTemplate } from '../../services/catalog.js'
-import { config, isApiMode } from '../../services/config.js'
+import { isApiMode } from '../../services/config.js'
+import { get } from '../../services/api.js'
 const type = ref('coupon'),
   id = ref('')
+const loading = ref(isApiMode())
+const loadError = ref('')
+const remoteContent = ref([])
 onLoad((q) => {
   type.value = q.type || 'coupon'
   id.value = q.id || ''
 })
+function ruleSections(raw) {
+  let parsed = raw
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed) } catch { return [] }
+  }
+  const sections = Array.isArray(parsed) ? parsed : parsed?.[type.value]
+  if (!Array.isArray(sections)) return []
+  return sections.map(section => ({
+    heading: section.heading || section.title || '规则说明',
+    lines: Array.isArray(section.lines) ? section.lines : [section.text || ''],
+  }))
+}
+async function loadRules() {
+  if (!isApiMode()) return
+  loading.value = true
+  loadError.value = ''
+  remoteContent.value = []
+  const [brandResult, contentResult] = await Promise.allSettled([get('/mini/brand'), get('/mini/content')])
+  const brand = brandResult.status === 'fulfilled' ? brandResult.value || {} : {}
+  const brandRules = ruleSections(brand.rules || brand.rulesJson)
+  const items = contentResult.status === 'fulfilled' && Array.isArray(contentResult.value) ? contentResult.value : []
+  const item = items.find(value => value.key === `rules.${type.value}`)
+  remoteContent.value = brandRules.length ? brandRules : ruleSections(item?.content)
+  if (!remoteContent.value.length && (brandResult.status === 'rejected' || contentResult.status === 'rejected')) {
+    loadError.value = '规则暂时无法加载'
+  }
+  loading.value = false
+}
+onShow(loadRules)
 const coupon = computed(() => getCouponTemplate(id.value))
 const title = computed(
   () =>
@@ -46,7 +85,7 @@ const title = computed(
       promotion: '推广规则',
       ranking: '排行规则',
       shipping: '配送说明',
-      campaign: '中秋活动规则',
+      campaign: '活动规则',
     })[type.value] || '规则说明',
 )
 const rules = {
@@ -115,16 +154,11 @@ const rules = {
 }
 const content = computed(() => {
   if (!isApiMode()) return rules[type.value] || []
-  const value = config.brand.rules?.[type.value] || config.brand.rules
-  const configured = Array.isArray(value) ? value : (() => {
-    try { return value ? JSON.parse(value) : [] } catch { return [] }
-  })()
-  if (Array.isArray(configured) && configured.length) return configured
-  const item = config.content?.[`rules.${type.value}`]?.content
-  if (!Array.isArray(item)) return []
-  return item.map((section) => ({
-    heading: section.heading || section.title || '规则说明',
-    lines: Array.isArray(section.lines) ? section.lines : [section.text || ''],
-  }))
+  return remoteContent.value
 })
 </script>
+<style scoped>
+.rules-status { margin: 18px 20px; padding: 18px 0; color: #68766e; font-size: 14px; }
+.rules-status.notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }
+.rules-status .text-button { flex: 0 0 auto; }
+</style>

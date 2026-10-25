@@ -1,13 +1,24 @@
 <script>
-import { loadCatalog } from './services/catalog.js'
+import { loadPresentationCatalog } from './services/catalog.js'
 import { toast } from './services/navigation.js'
+import { acceptEntryInvitation } from './services/invitation.js'
+
+function acceptInvitation(options) {
+  acceptEntryInvitation(options).catch(() => toast('推广关系暂未确认，将在下次操作时重试'))
+}
+
+function preloadCatalog() {
+  loadPresentationCatalog().catch(() => {})
+}
 
 export default {
-  onLaunch() {
-    loadCatalog().catch((error) => toast(error.message))
+  onLaunch(options) {
+    acceptInvitation(options)
+    preloadCatalog()
   },
-  onShow() {
-    loadCatalog().catch((error) => toast(error.message))
+  onShow(options) {
+    acceptInvitation(options)
+    preloadCatalog()
   },
 }
 </script>

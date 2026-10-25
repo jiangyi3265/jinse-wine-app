@@ -15,6 +15,13 @@
       }
     },
     {
+      "path": "pages/cart/index",
+      "style": {
+        "navigationBarTitleText": "购物车",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/product/index",
       "style": {
         "navigationBarTitleText": "商品详情",
@@ -116,6 +123,13 @@
       "path": "pages/order-detail/index",
       "style": {
         "navigationBarTitleText": "订单详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/aftersale/index",
+      "style": {
+        "navigationBarTitleText": "退货换货",
         "navigationStyle": "custom"
       }
     },

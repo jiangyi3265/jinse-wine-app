@@ -6,9 +6,17 @@ const env = import.meta.env || {}
 const isNodeRuntime = typeof process !== 'undefined' && Boolean(process.versions?.node)
 export const config = reactive({
   mode: env.VITE_MINI_MODE || (isNodeRuntime ? 'demo' : 'api'),
-  apiBaseUrl: env.VITE_MINI_API_BASE_URL || (env.DEV ? '/dev-api' : 'http://127.0.0.1:8080'),
+  // Development addresses are injected by scripts/uni.mjs or bin/start-local.ps1.
+  // Keep the fallback empty so a production bundle can never carry a localhost URL.
+  apiBaseUrl: env.VITE_MINI_API_BASE_URL || '',
+  lotteryQrPrefix: env.VITE_MINI_LOTTERY_QR_PREFIX || '',
   finderUserName: '',
+  videoLiveFeedId: '',
+  videoLiveNonceId: '',
+  videoFeedId: '',
+  videoNonceId: '',
   officialAccountQr: '',
+  customerServiceQr: '',
   groupQr: '',
   brand: {},
   // 公开页面内容由后台维护，key 对应 /mini/content 返回的 contentKey。

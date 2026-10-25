@@ -1,6 +1,8 @@
 <template>
   <view class="empty-state">
-    <AppIcon :name="icon" :size="42" tone="gold" />
+    <view class="empty-state-mark" aria-hidden="true">
+      <AppIcon :name="icon" :size="34" tone="gold" />
+    </view>
     <text class="empty-title">{{ title }}</text>
     <text class="muted">{{ description }}</text>
     <button v-if="button" class="btn btn-outline" @click="$emit('action')">
