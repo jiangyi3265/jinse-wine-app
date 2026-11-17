@@ -22,14 +22,14 @@ function linesFor(ctx, value, width, maxLines) {
 }
 
 export function drawPromotionPoster(ctx, { product, userName, productImage, qrImage, demo }) {
-  ctx.setFillStyle('#102c22')
+  ctx.setFillStyle('#782d3b')
   ctx.fillRect(0, 0, 390, 236)
   ctx.setFillStyle('#ead1a2')
   ctx.setFontSize(20)
-  ctx.fillText('金色酒业', 24, 40)
-  ctx.setFillStyle('#b9c9bf')
+  ctx.fillText('雄森酒业', 24, 40)
+  ctx.setFillStyle('#e4c4ca')
   ctx.setFontSize(11)
-  ctx.fillText('甄选佳酿  ·  GOLDEN CELLAR', 24, 65)
+  ctx.fillText('甄选佳酿  ·  雄森精选', 24, 65)
   ctx.setFillStyle('#f3efe4')
   ctx.setFontSize(26)
   linesFor(ctx, product.name, 342, 2).forEach((line, i) => ctx.fillText(line, 24, 109 + i * 33))
@@ -42,13 +42,13 @@ export function drawPromotionPoster(ctx, { product, userName, productImage, qrIm
   ctx.fillText(price, 24, 213)
   const originalX = 24 + ctx.measureText(price).width + 12
   if (Number(product.originalPrice) > Number(product.price)) {
-    ctx.setFillStyle('#b9c9bf')
+    ctx.setFillStyle('#e4c4ca')
     ctx.setFontSize(13)
     const original = `¥${money(product.originalPrice)}`
     const originalWidth = ctx.measureText(original).width
     if (originalX + originalWidth <= 366) {
       ctx.fillText(original, originalX, 210)
-      ctx.setStrokeStyle('#b9c9bf')
+      ctx.setStrokeStyle('#e4c4ca')
       ctx.setLineWidth(1)
       ctx.beginPath()
       ctx.moveTo(originalX, 205)
@@ -63,12 +63,12 @@ export function drawPromotionPoster(ctx, { product, userName, productImage, qrIm
   ctx.drawImage(productImage.path, 24 + (342 - width) / 2, 248 + (260 - height) / 2, width, height)
   ctx.setFillStyle('#f3efe4')
   ctx.fillRect(0, 520, 390, 140)
-  ctx.setFillStyle('#21382b')
+  ctx.setFillStyle('#232321')
   ctx.setFontSize(18)
   linesFor(ctx, `${userName || '酒友'}的精选推荐`, 228, 2).forEach((line, i) => ctx.fillText(line, 20, 553 + i * 25))
   ctx.setFillStyle('#77736d')
   ctx.setFontSize(12)
-  ctx.fillText(demo ? '演示海报 · 二维码为示意' : '长按识别，进入金色酒业', 20, 605)
+  ctx.fillText(demo ? '演示海报 · 二维码为示意' : '长按识别，进入雄森酒业', 20, 605)
   ctx.setFontSize(10)
   ctx.fillText('展示价格仅供参考，以商品页及结算为准', 20, 641)
   ctx.drawImage(qrImage.path, 270, 535, 100, 100)

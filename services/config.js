@@ -40,6 +40,8 @@ export function mediaUrl(value) {
   if (!value) return ''
   if (!isApiMode() || /^([a-z]+:)?\/\//i.test(value) || value.startsWith('data:')) return value
   const base = config.apiBaseUrl?.replace(/\/$/, '')
+  // Catalog normalization and image components may both resolve the same URL.
+  if (base && (value === base || value.startsWith(`${base}/`))) return value
   return value.startsWith('/') && base ? `${base}${value}` : value
 }
 

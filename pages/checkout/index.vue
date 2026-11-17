@@ -8,10 +8,10 @@
       <view class="checkout-loading-button" />
     </view>
     <EmptyState v-else-if="loadError" title="结算信息暂时无法加载" :description="loadError" button="重新加载" @action="loadCheckout" />
-    <view v-else-if="product" class="section">
+    <view v-else-if="checkoutItems.length" class="section">
       <view class="fulfillment-switch">
-        <button :class="['fulfillment-option', { active: draft.fulfillmentMode !== 'pickup' }]" @click="setFulfillment('delivery')">平台配送</button>
-        <button :class="['fulfillment-option', { active: draft.fulfillmentMode === 'pickup' }]" @click="setFulfillment('pickup')">门店自提</button>
+        <button :class="['fulfillment-option', { active: draft.fulfillmentMode !== 'pickup' }]" @click="setFulfillment('delivery')"><AppIcon name="truck" :tone="draft.fulfillmentMode !== 'pickup' ? 'light' : 'ink'" :size="19" />平台配送</button>
+        <button :class="['fulfillment-option', { active: draft.fulfillmentMode === 'pickup' }]" @click="setFulfillment('pickup')"><AppIcon name="shop" :tone="draft.fulfillmentMode === 'pickup' ? 'light' : 'ink'" :size="19" />门店自提</button>
       </view>
       <button v-if="draft.fulfillmentMode === 'pickup'" class="checkout-address" @click="openStoreSelect">
         <AppIcon name="shop" tone="gold" :size="36" />
@@ -39,15 +39,15 @@
         <text>{{ storeError }}</text>
         <button @click="refreshStores">重试门店</button>
       </view>
-      <view class="order-product">
-        <image class="order-photo" :src="productImage(product.image)" mode="aspectFill" />
+      <view v-for="line in checkoutItems" :key="line.id || line.productId" class="order-product">
+        <image class="order-photo" :src="productImage(line.image)" mode="aspectFill" />
         <view class="grow">
-          <text class="strong block">{{ product.name }}</text>
+          <text class="strong block">{{ line.name }}</text>
           <view class="between">
-            <text class="muted">{{ quote.spec || product.spec }}</text>
-            <text>× {{ draft.quantity }}</text>
+            <text class="muted">{{ line.spec }}</text>
+            <text>× {{ line.quantity }}</text>
           </view>
-          <PriceTag :value="quote.unitPrice ?? product.price" :original="product.originalPrice" />
+          <PriceTag :value="line.price" />
         </view>
       </view>
       <view v-if="couponError" class="checkout-store-error">
@@ -81,6 +81,12 @@
           </view>
         </view>
       </view>
+      <view class="buyer-remark"><text>订单留言</text><textarea v-model="state.checkout.buyerRemark" maxlength="200" placeholder="选填，请填写您的收货或包装需求" /><text class="small muted">{{ (draft.buyerRemark || '').length }}/200</text></view>
+      <view v-if="quoteError" class="checkout-quote-error" role="alert">
+        <text class="strong">订单金额暂未确认</text>
+        <text>{{ quoteError }}</text>
+        <view class="quote-error-actions"><button class="checkout-quote-retry" :disabled="quoteLoading || submitting" @click="updateQuote">重新计算</button><button class="quote-return" @click="returnToSelection">{{ draft.source === 'cart' ? '返回购物车' : '返回商品' }}</button></view>
+      </view>
       <view class="checkout-note">
         <AppIcon name="info" :size="16" />
         <text>{{ checkoutMessage }}</text>
@@ -91,7 +97,7 @@
           <text class="amount">{{ quoteReady ? `¥${money(quote.total, true)}` : '待确认' }}</text>
         </view>
         <button class="btn" :disabled="!canSubmit" @click="submit">
-          {{ submitting ? '提交中…' : draft.fulfillmentMode === 'pickup' && !storeReady ? '门店待确认' : draft.fulfillmentMode !== 'pickup' && !addressReady ? '地址待确认' : draft.couponId && !couponReady ? '优惠券待确认' : !hasFulfillmentTarget ? '请选择配送信息' : !quoteReady ? '正在确认金额' : '提交订单' }}
+          {{ submitting ? '提交中…' : draft.fulfillmentMode === 'pickup' && !storeReady ? '门店待确认' : draft.fulfillmentMode !== 'pickup' && !addressReady ? '地址待确认' : draft.couponId && !couponReady ? '优惠券待确认' : !hasFulfillmentTarget ? '请选择配送信息' : quoteError ? '金额待确认' : !quoteReady ? '正在确认金额' : '提交订单' }}
         </button>
       </view>
     </view>
@@ -105,7 +111,7 @@ import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import PriceTag from '../../components/PriceTag.vue'
 import EmptyState from '../../components/EmptyState.vue'
-import { state, submitOrder, quoteCheckout, refreshDomain } from '../../services/store.js'
+import { state, submitOrder, quoteCheckout, refreshDomain, loadCart, selectedCartItems } from '../../services/store.js'
 import { getProduct, stores, loadProductCatalog, loadCouponCatalog, loadStoreCatalog } from '../../services/catalog.js'
 import { quoteOrder, money } from '../../services/pricing.js'
 import { go, confirm, toast } from '../../services/navigation.js'
@@ -129,7 +135,10 @@ const draft = computed(() => state.checkout),
   submitting = ref(false),
   loading = ref(true),
   loadError = ref(''),
+  quoteLoading = ref(false),
+  quoteError = ref(''),
   serverQuote = ref(null)
+const checkoutItems = computed(() => draft.value.source === 'cart' ? selectedCartItems() : product.value ? [{ ...product.value, spec: quote.value.spec || product.value.spec, price: quote.value.unitPrice ?? product.value.price, quantity: draft.value.quantity }] : [])
 const hasFulfillmentTarget = computed(() => draft.value.fulfillmentMode === 'pickup' ? Boolean(selectedStore.value) : Boolean(address.value))
 const quote = computed(() =>
   isApiMode() ? serverQuote.value || { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: '正在计算订单金额' } : product.value
@@ -148,7 +157,7 @@ const quote = computed(() =>
 const quoteReady = computed(() => hasFulfillmentTarget.value && (!draft.value.couponId || couponReady.value) && (isApiMode()
   ? Boolean(serverQuote.value && !serverQuote.value.reason)
   : Boolean(product.value && !quote.value.reason)))
-const canSubmit = computed(() => !submitting.value && hasFulfillmentTarget.value && quoteReady.value)
+const canSubmit = computed(() => !submitting.value && !loading.value && !loadError.value && !quoteLoading.value && hasFulfillmentTarget.value && quoteReady.value)
 const checkoutMessage = computed(() => {
   if (draft.value.fulfillmentMode === 'pickup' && storeError.value) return '可重试门店资料，或改用平台配送'
   if (draft.value.fulfillmentMode === 'pickup' && storeLoading.value) return '正在读取自提门店'
@@ -156,6 +165,7 @@ const checkoutMessage = computed(() => {
   if (draft.value.fulfillmentMode !== 'pickup' && addressLoading.value) return '正在读取收货地址'
   if (draft.value.couponId && !couponReady.value) return '请重试优惠券，或取消使用优惠券'
   if (!hasFulfillmentTarget.value) return draft.value.fulfillmentMode === 'pickup' ? '请选择自提门店后确认金额' : '请选择收货地址后确认金额'
+  if (quoteError.value) return '请重新计算金额，或返回调整商品后再提交'
   if (!quoteReady.value) return quote.value.reason || '正在计算订单金额，请稍候'
   return quote.value.discount ? '优惠已抵扣' : '金额已确认，提交后可在订单中查看'
 })
@@ -164,17 +174,24 @@ async function updateQuote() {
   if (!isApiMode()) return
   const current = ++quoteRevision
   serverQuote.value = null
+  quoteLoading.value = false
+  quoteError.value = ''
   const needsFulfillmentTarget = draft.value.fulfillmentMode === 'pickup'
     ? Boolean(selectedStore.value)
     : Boolean(address.value)
-  if (!product.value || !needsFulfillmentTarget || (draft.value.couponId && !couponReady.value)) return
+  if (!(draft.value.source === 'cart' ? selectedCartItems().length : product.value) || !needsFulfillmentTarget || (draft.value.couponId && !couponReady.value)) return
+  quoteLoading.value = true
   try {
     const result = await quoteCheckout()
-    if (current === quoteRevision) serverQuote.value = result
+    if (current === quoteRevision) { serverQuote.value = result; quoteError.value = result?.reason || '' }
   } catch (error) {
-    if (current === quoteRevision) serverQuote.value = { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: error.message }
-  }
+    if (current === quoteRevision) {
+      quoteError.value = error.message || '暂时无法计算订单金额，请重试'
+      serverQuote.value = { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: quoteError.value }
+    }
+  } finally { if (current === quoteRevision) quoteLoading.value = false }
 }
+function returnToSelection() { go(draft.value.source === 'cart' ? 'cart' : 'product', draft.value.source === 'cart' ? {} : { id: draft.value.productId }) }
 watch(() => [draft.value.productId, draft.value.skuCode, draft.value.quantity, draft.value.couponId, draft.value.addressId, draft.value.fulfillmentMode, draft.value.pickupStoreId,
   draft.value.fulfillmentMode === 'pickup' ? storeReady.value : addressReady.value,
   draft.value.couponId ? couponReady.value : true], updateQuote, { immediate: true })
@@ -223,13 +240,14 @@ async function loadCheckout() {
   if (!isApiMode()) { loading.value = false; return }
   try {
     await loadProductCatalog()
+    if (draft.value.source === 'cart') { await loadCart(); if (!selectedCartItems().length || selectedCartItems().length !== draft.value.cartItemIds.length) throw new Error('所选商品已变化，请返回购物车重新选择') }
     await Promise.all([
       refreshCoupons(),
       draft.value.fulfillmentMode === 'pickup' ? refreshStores() : refreshAddresses(),
     ])
   } catch (error) {
     loadError.value = error.message || '结算信息暂时无法获取，请稍后重试'
-  } finally { loading.value = false }
+  } finally { loading.value = false; await updateQuote() }
 }
 onShow(loadCheckout)
 const maskPhone = (p) => (p ? `${p.slice(0, 3)}****${p.slice(-4)}` : '')
@@ -238,7 +256,7 @@ function openAddressSelect() {
   go('addresses', { select: '1' })
 }
 function openCouponSelect() {
-  go('coupons', { mode: 'select' })
+  go('coupons', { mode: 'select', source: draft.value.source === 'cart' ? 'cart' : 'product' })
 }
 async function setFulfillment(mode) {
   state.checkout.fulfillmentMode = mode
@@ -255,7 +273,7 @@ async function openStoreSelect() {
   })
 }
 async function submit() {
-  if (submitting.value) return
+  if (submitting.value || loading.value || loadError.value || quoteLoading.value) return
   if (draft.value.couponId && !couponReady.value) return toast('请先确认优惠券，或取消使用优惠券')
   if (draft.value.fulfillmentMode !== 'pickup' && !addressReady.value) return toast('请先确认收货地址')
   if (draft.value.fulfillmentMode === 'pickup' ? !selectedStore.value : !address.value) return toast(draft.value.fulfillmentMode === 'pickup' ? '请先选择自提门店' : '请先填写收货地址')
@@ -282,6 +300,11 @@ async function submit() {
 </script>
 
 <style scoped>
+.checkout-quote-error { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding: 14px; border: 1px solid #d9b7bd; border-radius: 10px; background: #f8eff0; color: #782d3b; font-size: 13px; line-height: 1.7; overflow-wrap: break-word; }
+.quote-error-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 2px; }
+.checkout-quote-retry, .quote-return { min-height: 40px; padding: 7px 14px; border-radius: 7px; font-size: 13px; line-height: 24px; }
+.checkout-quote-retry { color: #faf9f6; background: #782d3b; }
+.quote-return { color: #782d3b; border: 1px solid #cfb5ab; background: transparent; }
 .checkout-loading { padding: 22px 16px 110px; }
 .checkout-loading-line, .checkout-loading-card, .checkout-loading-button { background: linear-gradient(100deg, #eeeae1 20%, #f8f5ee 38%, #eeeae1 56%); background-size: 300% 100%; animation: checkout-skeleton 1.4s ease-in-out infinite; }
 .checkout-loading-line { width: 72%; height: 14px; margin-top: 14px; }
@@ -297,4 +320,5 @@ async function submit() {
 .checkout-store-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 14px; padding: 11px 12px; border-left: 3px solid #a65047; background: #fff7f5; color: #87443d; font-size: 13px; }
 .checkout-store-error button { flex: 0 0 auto; padding: 0; color: #87443d; background: transparent; font-size: 12px; font-weight: 600; }
 .checkout-clear-coupon { display: block; width: auto; margin: 8px 0 0 auto; padding: 0; color: #87443d; background: transparent; font-size: 12px; }
+.buyer-remark { margin-top: 16px; background: #fcfbf9; border: 1px solid #eeeae6; border-radius: 12px; padding: 16px; font-size: 14px; }.buyer-remark textarea { width: 100%; height: 72px; font-size: 13px; margin-top: 12px; }.buyer-remark .small { display: block; text-align: right; }
 </style>

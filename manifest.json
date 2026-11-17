@@ -1,12 +1,12 @@
 {
-    "name" : "金色酒业",
+    "name" : "雄森酒业",
     "appid" : "__UNI__959E300",
-    "description" : "金色酒业微信小程序前端",
+    "description" : "雄森酒业微信小程序前端",
     "uniStatistics" : {
         "enable" : false
     },
     "h5" : {
-        "title" : "金色酒业",
+        "title" : "雄森酒业",
         "router" : {
             "mode" : "hash"
         }
@@ -62,14 +62,18 @@
         "appid" : "wx7e0ac06d1c28077a",
         "permission" : {
             "scope.userLocation" : {
-                "desc" : "用于定位当前位置并计算到门店的距离"
+                "desc" : "用于在地图查找门店、到店导航及计算门店距离"
             }
         },
         "requiredPrivateInfos" : [
-            "getLocation"
+            "getLocation",
+            "chooseLocation"
         ],
         "setting" : {
-            "urlCheck" : true
+            "urlCheck" : true,
+            "minified" : true,
+            "minifyWXSS" : true,
+            "minifyWXML" : true
         },
         "usingComponents" : true
     },

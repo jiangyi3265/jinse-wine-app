@@ -20,11 +20,12 @@
         </button>
       </view>
       <view class="promotion-total">
-        <text class="promotion-total-label">累计佣金</text>
+        <text class="promotion-total-label">可提现佣金（元）</text>
         <view class="promotion-money">
           <text class="currency">{{ loadError ? '' : '¥' }}</text>
-          {{ loadError ? '—' : (total / 100).toFixed(2) }}
+          {{ loadError ? '—' : (settled / 100).toFixed(2) }}
         </view>
+        <button class="btn btn-small promotion-withdraw" :disabled="Boolean(loadError) || promotionLoading || withdrawing || settled < minWithdrawCent" @click="withdrawOpen = true">申请提现</button>
       </view>
       <view class="promotion-splits">
         <view>
@@ -32,19 +33,17 @@
           <text class="serif">{{ loadError ? '—' : `¥${(pending / 100).toFixed(2)}` }}</text>
         </view>
         <view>
-          <text class="small block">已结算</text>
-          <text class="serif">{{ loadError ? '—' : `¥${(settled / 100).toFixed(2)}` }}</text>
+          <text class="small block">累计佣金</text>
+          <text class="serif">{{ loadError ? '—' : `¥${(total / 100).toFixed(2)}` }}</text>
         </view>
         <view>
-          <text class="small block">已提现</text>
+          <text class="small block">已到账</text>
           <text class="serif">{{ loadError ? '—' : `¥${(paid / 100).toFixed(2)}` }}</text>
         </view>
       </view>
-      <button class="withdraw-button" :disabled="promotionLoading || withdrawing || !!loadError || settled < minWithdrawCent" @click="withdrawAll">
-        {{ withdrawing ? '正在提交' : loadError ? '佣金数据待刷新' : settled >= minWithdrawCent ? `申请提现 ¥${(settled / 100).toFixed(2)}` : `满 ¥${(minWithdrawCent / 100).toFixed(2)} 可申请提现` }}
-      </button>
     </view>
     <view class="promotion-content">
+      <ProductReferral detailed @rules="promotionRulesOpen = true" />
       <view v-if="loadError" class="notice promotion-error">
         <AppIcon name="info" :size="19" />
         <view class="grow column">
@@ -52,25 +51,13 @@
           <button class="text-button" @click="loadPromotion">重新加载</button>
         </view>
       </view>
-      <button class="btn" @click="go('poster')">
-        生成推广海报
-        <AppIcon name="export" tone="light" :size="22" />
-      </button>
-      <button class="link-row" @click="go('team')">
-        <view class="grow">
-          <AppIcon name="users" />
-          我的团队
-        </view>
-        <text class="muted small">{{ loadError ? '—' : `${teamCount}人` }}</text>
-        <AppIcon name="chevron" :size="17" />
-      </button>
-      <button class="link-row" @click="go('ranking')">
-        <view class="grow">
-          <AppIcon name="trophy" />
-          销冠排行榜
-        </view>
-        <AppIcon name="chevron" :size="17" />
-      </button>
+      <view class="promotion-entry-grid">
+        <button @click="go('poster')"><AppIcon name="export" :size="25" /><text>推广海报</text></button>
+        <button @click="go('team')"><AppIcon name="users" :size="25" /><text>我的团队</text></button>
+        <button @click="go('ranking')"><AppIcon name="trophy" :size="25" /><text>推广排行</text></button>
+        <button @click="go('records', { type: 'commission' })"><AppIcon name="wallet" :size="25" /><text>佣金明细</text></button>
+      </view>
+      <CommissionTransfers />
       <view class="section-heading section-space">
         <text class="section-title serif">佣金明细</text>
         <button class="text-button small" @click="go('records', { type: 'commission' })">全部明细 <AppIcon name="chevron" :size="16" /></button>
@@ -99,10 +86,24 @@
       <view v-else class="commission-empty">{{ loadError ? '佣金明细暂不可用' : '暂无佣金记录' }}</view>
       <text v-if="!isApiMode()" class="profile-demo">演示推广业绩，实际佣金以服务端结算为准</text>
     </view>
+    <view v-if="withdrawOpen" class="sheet-backdrop" @click="closeWithdraw">
+      <view class="sheet withdraw-sheet" @click.stop>
+        <view class="section-heading"><text class="sheet-title">佣金提现</text><button class="icon-button" aria-label="关闭提现窗口" :disabled="withdrawing" @click="closeWithdraw"><AppIcon name="close" :size="22" /></button></view>
+        <text class="small muted block">提现金额</text>
+        <view class="withdraw-amount"><text>¥</text><text>{{ (settled / 100).toFixed(2) }}</text><text class="small muted">全部提现</text></view>
+        <text class="small muted block">满 {{ (minWithdrawCent / 100).toFixed(2) }} 元可申请，提交后由财务审核发放。</text>
+        <view class="notice section-space"><AppIcon name="info" :size="18" /><text>仅已结算佣金可提现，退款将相应扣回佣金。到账结果可在提现记录中查看。</text></view>
+        <button class="btn" :disabled="withdrawing || settled < minWithdrawCent || Boolean(loadError)" @click="withdrawAll(true)">{{ withdrawing ? '正在提交' : '确认提现' }}</button>
+      </view>
+    </view>
+    <ActivityRules v-model="promotionRulesOpen" type="promotion" />
   </PageShell>
 </template>
 <script setup>
 import PageShell from '../../components/PageShell.vue'
+import CommissionTransfers from '../../components/CommissionTransfers.vue'
+import ProductReferral from '../../components/ProductReferral.vue'
+import ActivityRules from '../../components/ActivityRules.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
@@ -111,6 +112,7 @@ import { products } from '../../services/catalog.js'
 import { go, toast } from '../../services/navigation.js'
 import { isApiMode } from '../../services/config.js'
 const total = computed(() => state.promotion?.total || 0)
+const promotionRulesOpen = ref(false)
 const pending = computed(() => state.promotion?.pending || 0)
 const settled = computed(() => state.promotion?.settled || 0)
 const paid = computed(() => state.promotion?.paid || 0)
@@ -121,6 +123,10 @@ const minWithdrawCent = computed(() => {
 })
 const promoterLabel = computed(() => state.user.role === 'staff' ? '员工推广员' : '客户推广员')
 const withdrawing = ref(false)
+const withdrawOpen = ref(false)
+function closeWithdraw() {
+  if (!withdrawing.value) withdrawOpen.value = false
+}
 const promotionLoading = ref(true)
 const loadError = ref('')
 const commissionStatus = (record) => {
@@ -148,12 +154,13 @@ async function loadPromotion() {
   finally { promotionLoading.value = false }
 }
 onShow(loadPromotion)
-async function withdrawAll() {
+async function withdrawAll(confirmed = false) {
   if (withdrawing.value || loadError.value || settled.value < minWithdrawCent.value) return
-  if (!(await new Promise(resolve => uni.showModal({ title: '申请提现', content: `申请提现全部可提现佣金 ¥${(settled.value / 100).toFixed(2)}？`, success: result => resolve(result.confirm), fail: () => resolve(false) })))) return
+  if (!confirmed && !(await new Promise(resolve => uni.showModal({ title: '申请提现', content: `申请提现全部可提现佣金 ¥${(settled.value / 100).toFixed(2)}？`, success: result => resolve(result.confirm), fail: () => resolve(false) })))) return
   withdrawing.value = true
   try {
     const result = await withdrawCommission(settled.value)
+    withdrawOpen.value = false
     toast(({ paid: '提现已完成，请查看佣金记录', failed: '提现申请已退回，请查看佣金记录',
       processing: '提现审核中，等待财务付款' })[result.status] || '提现申请已提交，等待财务审核')
     try { await refreshDomain('promotion'); loadError.value = '' }

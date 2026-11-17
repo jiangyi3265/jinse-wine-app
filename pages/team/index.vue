@@ -1,11 +1,13 @@
 <template>
   <PageShell title="我的团队">
     <view class="section">
+      <view class="team-summary"><view><text class="muted small">团队成员</text><text class="team-number">{{ members.length }}</text></view><view><text class="muted small">本月加入</text><text class="team-number">{{ newMembers }}</text></view></view>
+      <view class="search-box"><input v-model="keyword" placeholder="搜索成员昵称" aria-label="搜索团队成员" /><button v-if="keyword" class="text-button" @click="keyword = ''">清除</button></view>
       <view class="section-heading">
         <text class="section-title serif">我的团队 · {{ members.length }}人</text>
         <text v-if="!isApiMode()" class="muted small">演示数据</text>
       </view>
-      <view v-for="(member, index) in members" :key="member.id || member.name" class="record-row">
+      <view v-for="(member, index) in filteredMembers" :key="member.id || member.name" class="record-row">
         <image v-if="member.avatar" :src="member.avatar" class="rank-avatar team-avatar" mode="aspectFill" />
         <view v-else class="rank-avatar">{{ (member.name || '').slice(0, 1) }}</view>
         <view class="grow">
@@ -15,13 +17,14 @@
         <text class="muted small">{{ member.status || (isApiMode() ? '已加入团队' : (index < 3 ? '已成交' : '待成交')) }}</text>
       </view>
       <EmptyState
-        v-if="!loading && !members.length"
-        :title="loadError ? '团队信息暂时无法加载' : '还没有团队成员'"
+        v-if="!loading && !filteredMembers.length"
+        :title="loadError ? '团队信息暂时无法加载' : keyword ? '没有找到匹配成员' : '还没有团队成员'"
         :description="loadError || '分享推广海报，邀请好友成为你的团队成员'"
         :button="loadError ? '重新加载' : '生成推广海报'"
         icon="users"
         @action="loadError ? loadTeam() : go('poster')"
       />
+      <view class="team-invite"><button class="btn" @click="go('poster')">邀请好友加入</button></view>
     </view>
   </PageShell>
 </template>
@@ -48,6 +51,9 @@ const names = [
   '郑先生',
 ]
 const members = computed(() => isApiMode() ? state.team : names.map((name) => ({ name })))
+const keyword = ref('')
+const filteredMembers = computed(() => members.value.filter(member => (member.name || '').toLowerCase().includes(keyword.value.trim().toLowerCase())))
+const newMembers = computed(() => members.value.filter(member => { const date = new Date(member.createdAt); const today = new Date(); return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() }).length)
 const loading = ref(false), loadError = ref('')
 function formatJoinedAt(value) {
   if (!value) return '已加入团队'
@@ -65,3 +71,5 @@ async function loadTeam() {
 }
 onShow(loadTeam)
 </script>
+
+<style scoped>.team-summary { display: flex; gap: 20px; padding: 22px; border: 1px solid #e9e5e1; border-radius: 12px; background: #fcfbf9; }.team-summary > view { flex: 1; }.team-number { display: block; margin-top: 8px; font-size: 30px; color: #782d3b; }.team-invite { margin-top: 32px; }.team-invite .btn { width: 100%; }.section .search-box { margin: 20px 0; }</style>

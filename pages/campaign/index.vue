@@ -56,12 +56,13 @@
         </button>
       </view>
       <view class="center section-space">
-        <button class="text-button" @click="go('rules', { type: 'campaign' })">
+        <button class="text-button" @click="rulesOpen = true">
           活动规则
           <AppIcon name="arrow" :size="21" />
         </button>
       </view>
     </view>
+    <ActivityRules v-model="rulesOpen" />
   </PageShell>
 </template>
 <script setup>
@@ -69,6 +70,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
+import ActivityRules from '../../components/ActivityRules.vue'
 import { claimCoupon, couponClaimLimitReached, refreshDomain } from '../../services/store.js'
 import { couponTemplates, loadCouponCatalog } from '../../services/catalog.js'
 import { config, displayValue, isApiMode, assetUrl, mediaUrl } from '../../services/config.js'
@@ -87,6 +89,7 @@ const groupBenefit = computed(() => groupCoupon.value?.kind === 'percent'
   : { value: String(Number(groupCoupon.value?.amount || 0) / 100), unit: '元' })
 const claimed = computed(() => campaignCoupon.value?.id && couponClaimLimitReached(campaignCoupon.value.id))
 const loadError = ref('')
+const rulesOpen = ref(false)
 async function loadCampaign() {
   if (couponLoading.value) return
   couponLoading.value = true

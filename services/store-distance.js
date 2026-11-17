@@ -2,7 +2,7 @@ import { hasStoreCoordinates } from './navigation.js'
 
 // All store coordinates and WeChat locations use GCJ-02. Distances are straight-line metres.
 export function distanceMetres(store, location) {
-  if (!hasStoreCoordinates(store) || !hasStoreCoordinates(location)) return null
+  if (store?.locationSimulated || !hasStoreCoordinates(store) || !hasStoreCoordinates(location)) return null
   const rad = value => Number(value) * Math.PI / 180
   const deltaLat = rad(store.latitude) - rad(location.latitude)
   const deltaLng = rad(store.longitude) - rad(location.longitude)

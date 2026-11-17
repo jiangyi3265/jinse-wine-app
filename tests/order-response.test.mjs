@@ -8,19 +8,23 @@ let withdrawalStatus = 'pending'
 let paymentOrderStatus = 'pending'
 let paymentTradeState = 'NOTPAY'
 let paymentUiCalls = 0
+let paymentUiError = null
+let paymentSyncError = null
 globalThis.uni = {
   getStorageSync: key => key === 'jinse-mini-token-v1' ? 'A'.repeat(48) : memory.get(key),
   setStorageSync: (key, value) => memory.set(key, value),
   removeStorageSync: key => memory.delete(key),
-  requestPayment: async () => { paymentUiCalls += 1 },
+  requestPayment: async () => { paymentUiCalls += 1; if (paymentUiError) throw paymentUiError },
   request: async ({ url, method, data }) => {
     requests.push({ url, method, data })
     if (method === 'POST' && url === '/mini/orders/pay-order/pay')
       return { statusCode: 200, data: { code: 0, data: { timeStamp: '1', nonceStr: 'nonce', package: 'prepay_id=123', paySign: 'sign' } } }
     if (method === 'GET' && url === '/mini/orders/pay-order')
       return { statusCode: 200, data: { code: 0, data: { id: 'pay-order', status: paymentOrderStatus, total: 1000 } } }
-    if (method === 'POST' && url === '/mini/orders/pay-order/pay-sync')
+    if (method === 'POST' && url === '/mini/orders/pay-order/pay-sync') {
+      if (paymentSyncError) throw paymentSyncError
       return { statusCode: 200, data: { code: 0, data: { id: 'pay-order', status: paymentOrderStatus, total: 1000, wechatTradeState: paymentTradeState } } }
+    }
     if (method === 'POST' && url === '/mini/orders')
       return { statusCode: 200, data: { code: 0, data: { id: 'order-single', status: 'pending', couponId: 'coupon-single' } } }
     if (method === 'POST' && url === '/mini/orders/cart')
@@ -185,4 +189,76 @@ test('merchant status sync keeps pending payment blocked until the server confir
   assert.equal(paid.status, 'paid')
   assert.equal(paid.paymentAwaiting, false)
   assert.equal(memory.get('jinse-mini-request-ids-v1')['pay-awaiting:pay-order'], undefined)
+})
+
+function resetFailedPayment(tradeState = 'NOTPAY') {
+  memory.clear()
+  paymentOrderStatus = 'pending'
+  paymentTradeState = tradeState
+  paymentSyncError = null
+  paymentUiError = { errno: 102, errMsg: 'requestPayment:fail jsapi has no permission' }
+  state.orders = [{ id: 'pay-order', status: 'pending', total: 1000 }]
+}
+
+test('native failure retains its reason and signed NOTPAY permits a fresh retry', async () => {
+  resetFailedPayment()
+  await assert.rejects(payOrder('pay-order'), error => {
+    assert.match(error.message, /权限受限/)
+    assert.match(error.paymentDetail, /jsapi has no permission/)
+    assert.match(error.paymentDetail, /102/)
+    return true
+  })
+  assert.equal(state.orders[0].paymentAwaiting, false)
+  assert.equal(memory.get('jinse-mini-request-ids-v1')['pay:pay-order'], undefined)
+  const attempts = paymentUiCalls
+  paymentUiError = null
+  await payOrder('pay-order')
+  assert.equal(paymentUiCalls, attempts + 1)
+})
+
+test('failed native payment with USERPAYING or unavailable query remains blocked', async () => {
+  for (const mode of ['USERPAYING', 'network']) {
+    resetFailedPayment('USERPAYING')
+    if (mode === 'network') paymentSyncError = Error('offline')
+    await assert.rejects(payOrder('pay-order'), error => {
+      assert.match(error.paymentDetail, /jsapi has no permission/)
+      assert.match(error.paymentDetail, /勿重复付款/)
+      return true
+    })
+    assert.equal(state.orders[0].paymentAwaiting, true)
+    const attempts = paymentUiCalls
+    await payOrder('pay-order')
+    assert.equal(paymentUiCalls, attempts)
+  }
+})
+
+test('manual signed NOTPAY or NOT_FOUND sync unlocks previously stuck orders', async () => {
+  for (const tradeState of ['NOTPAY', 'NOT_FOUND']) {
+    resetFailedPayment('USERPAYING')
+    await assert.rejects(payOrder('pay-order'))
+    paymentTradeState = tradeState
+    const order = await syncPaymentOrder('pay-order')
+    assert.equal(order.paymentAwaiting, false)
+    assert.equal(memory.get('jinse-mini-request-ids-v1')['pay:pay-order'], undefined)
+  }
+})
+
+test('server-confirmed payment wins over a failed native callback', async () => {
+  resetFailedPayment('SUCCESS')
+  paymentOrderStatus = 'paid'
+  const order = await payOrder('pay-order')
+  assert.equal(order.status, 'paid')
+  assert.equal(order.paymentAwaiting, false)
+})
+
+test('cancel is retryable only after the server confirms NOTPAY', async () => {
+  resetFailedPayment('USERPAYING')
+  paymentUiError = { errMsg: 'requestPayment:fail cancel' }
+  await assert.rejects(payOrder('pay-order'))
+  assert.equal(state.orders[0].paymentAwaiting, true)
+  resetFailedPayment('NOTPAY')
+  paymentUiError = { errMsg: 'requestPayment:fail cancel' }
+  const order = await payOrder('pay-order')
+  assert.equal(order.paymentCancelled, true)
+  assert.equal(order.paymentAwaiting, false)
 })

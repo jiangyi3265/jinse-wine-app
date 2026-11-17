@@ -31,7 +31,7 @@ export async function confirm(title, content, confirmText = '确认') {
     content,
     confirmText,
     cancelText: '取消',
-    confirmColor: '#182D28',
+    confirmColor: '#782D3B',
   })
   return result.confirm
 }
@@ -61,15 +61,64 @@ export function hasStoreCoordinates(store) {
     && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
     && (latitude !== 0 || longitude !== 0)
 }
-export function locateStore(store) {
-  if (!hasStoreCoordinates(store)) return toast('门店导航位置尚未配置')
-  uni.openLocation({
-    latitude: Number(store.latitude),
-    longitude: Number(store.longitude),
-    name: store.name,
-    address: store.address,
-    fail: () => toast('无法打开地图，请检查定位权限'),
+export function hasVerifiedStoreCoordinates(store) {
+  return !store?.locationSimulated && hasStoreCoordinates(store)
+}
+export function canLocateStore(store) {
+  return hasVerifiedStoreCoordinates(store) || Boolean(String(store?.address || '').trim())
+}
+// H5 opens the map provider's public page; it does not need an embedded map SDK key.
+export function storeMapUrl(store) {
+  if (hasVerifiedStoreCoordinates(store)) {
+    return `https://uri.amap.com/marker?position=${Number(store.longitude)},${Number(store.latitude)}&name=${encodeURIComponent(store.name || store.address || '门店')}&coordinate=gaode&src=xiongsen-wine&callnative=1`
+  }
+  return `https://uri.amap.com/search?keyword=${encodeURIComponent(String(store?.address || '').trim())}&city=${encodeURIComponent(store?.city || '')}&view=list&src=xiongsen-wine&callnative=1`
+}
+function mapFailure(store, error, retry) {
+  const message = String(error?.errMsg || '')
+  if (/cancel/i.test(message)) return
+  const permissionDenied = /auth deny|auth denied|authorize.*fail|permission denied/i.test(message)
+  uni.showModal({
+    title: permissionDenied ? '需要地图位置权限' : '地图暂时无法打开',
+    content: `${store.address || store.name}\n${permissionDenied ? '开启位置权限后，可以在地图中查找门店。' : '您可以复制地址，在微信或地图应用中搜索门店。'}`,
+    confirmText: permissionDenied ? '去设置' : '复制地址', cancelText: '关闭',
+    success: ({ confirm }) => {
+      if (!confirm) return
+      if (permissionDenied) uni.openSetting({
+        success: ({ authSetting }) => { if (authSetting?.['scope.userLocation']) retry() },
+        fail: () => toast('请在小程序设置中开启位置权限'),
+      })
+      else uni.setClipboardData({ data: store.address || store.name })
+    },
   })
+}
+function openStorePoint(point, store) {
+  uni.openLocation({
+    latitude: Number(point.latitude), longitude: Number(point.longitude),
+    name: point.name || '所选位置', address: point.address || '', scale: 17,
+    fail: error => mapFailure(store, error, () => openStorePoint(point, store)),
+  })
+}
+export function locateStore(store) {
+  if (!canLocateStore(store)) return toast('门店地址和导航位置尚未配置')
+  // #ifdef H5
+  if (typeof window !== 'undefined') {
+    window.location.assign(storeMapUrl(store))
+    return
+  }
+  // #endif
+  if (hasVerifiedStoreCoordinates(store)) return openStorePoint(store, store)
+  // WeChat chooseLocation cannot prefill a keyword. Copy the address for pasting
+  // into its search box. Never send a simulated point to a real navigation route.
+  const choose = () => uni.chooseLocation({
+    success: point => {
+      if (!hasStoreCoordinates(point)) return toast('未取得有效位置，请重新选择')
+      // Keep the selected POI's own name/address, and never persist it as the store.
+      openStorePoint(point, store)
+    },
+    fail: error => mapFailure(store, error, choose),
+  })
+  uni.setClipboardData({ data: String(store.address).trim(), showToast: false, complete: choose })
 }
 export function dateLabel(time) {
   if (!time) return '—'

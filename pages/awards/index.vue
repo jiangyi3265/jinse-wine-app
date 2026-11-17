@@ -33,33 +33,36 @@
       <template v-for="(award, index) in filtered" :key="award.id">
         <view v-if="index === 0 || expanded === award.id" class="award-panel">
           <view class="award-top">
-            <view v-if="award.kind === 'ticket' && !award.image" class="ticket-cover"><AppIcon name="coupon" :size="32" /><text>门票</text></view>
+            <view v-if="['ticket', 'voucher'].includes(award.kind) && !award.image" class="ticket-cover"><AppIcon name="coupon" :size="32" /><text>{{ award.kind === 'voucher' ? '电子券' : '门票' }}</text></view>
             <image v-else :src="productImage(award.image)" mode="aspectFill" />
             <view class="grow column">
               <text class="section-title serif">{{ award.name }}</text>
               <text class="muted">{{ award.spec }}</text>
-              <text v-if="award.kind === 'goods'" class="muted small">{{ award.redeemStoreName || '合作门店均可兑换' }}</text>
+              <text v-if="['goods', 'voucher'].includes(award.kind)" class="muted small">{{ awardVenue(award) }}</text>
               <text v-if="award.kind === 'ticket'" class="muted small">售票方：{{ award.providerName }}</text>
             </view>
             <text :class="award.status === 'pending' ? 'gold' : 'ink'">
               {{ award.kind === 'ticket' && award.status === 'pending' ? '已发放' : awardStatus(award.status) }}
             </text>
           </view>
+          <view v-if="exchangeDetail(award)?.sections.length" class="award-use-info">
+            <view v-for="section in exchangeDetail(award).sections" :key="section.heading"><text class="strong block">{{ section.heading }}</text><text v-for="line in section.lines" :key="line" class="muted block">{{ line }}</text></view>
+          </view>
           <view v-if="award.status === 'pending'" class="award-qr">
             <QrCode :src="qrById[award.id]" />
-            <text class="strong">{{ award.kind === 'ticket' ? '请向售票方出示门票' : '请向门店核销员出示' }}</text>
+            <text class="strong">{{ award.kind === 'ticket' ? '请向售票方出示门票' : '请向指定核销点工作人员出示' }}</text>
             <text v-if="award.kind === 'ticket'" class="muted small">使用状态以售票方验票结果为准</text>
             <text v-else class="muted small">兑换码仅用于奖品核销</text>
             <text class="small muted">{{ award.kind === 'ticket' ? `票号：${award.ticketNo || ''}` : `兑换码：${award.code}` }}</text>
             <text v-if="award.kind === 'ticket' && award.expiresAt" class="small muted">有效期至：{{ formatExpiry(award.expiresAt) }}</text>
-            <text v-if="award.kind === 'goods'" class="small muted">核销门店：{{ award.redeemStoreName || '合作门店均可' }}</text>
+            <text v-if="['goods', 'voucher'].includes(award.kind)" class="small muted">使用地点：{{ awardVenue(award) }}</text>
             <text v-if="qrLoading[award.id]" class="small muted">正在生成专属核销二维码…</text>
             <text v-else-if="qrErrors[award.id]" class="small muted">{{ qrErrors[award.id] }}{{ award.kind === 'ticket' ? '' : '，可出示上方兑换码' }}</text>
             <button v-if="qrErrors[award.id]" class="text-button small" :disabled="qrLoading[award.id]" @click="loadRewardQrs">重新生成</button>
           </view>
         </view>
         <view v-else class="award-small">
-          <view v-if="award.kind === 'ticket' && !award.image" class="ticket-cover"><AppIcon name="coupon" :size="28" /><text>门票</text></view>
+          <view v-if="['ticket', 'voucher'].includes(award.kind) && !award.image" class="ticket-cover"><AppIcon name="coupon" :size="28" /><text>{{ award.kind === 'voucher' ? '电子券' : '门票' }}</text></view>
           <image v-else :src="productImage(award.image)" mode="aspectFill" />
           <view class="grow">
             <text class="strong block">{{ award.name }}</text>
@@ -101,6 +104,10 @@ import { go } from '../../services/navigation.js'
 import { isApiMode } from '../../services/config.js'
 import { get } from '../../services/api.js'
 import { ticketImageSource, removeTicketImage } from '../../services/ticket-code.js'
+import { loadPointsContent, rewardExchangeDetail } from '../../services/points-content.js'
+const exchangeDetails = ref({})
+const exchangeDetail = award => rewardExchangeDetail(award, exchangeDetails.value)
+const awardVenue = award => exchangeDetail(award)?.venue || award.redeemStoreName || '请按券面说明联系对应服务方'
 const tab = ref('待兑换'),
   expanded = ref(''),
   qrById = reactive({}),
@@ -121,7 +128,10 @@ function clearTicketQrs() {
   ticketPaths.clear()
 }
 const formatExpiry = value => { const date = new Date(Number(value)); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
-async function loadAwards(targetPage = pageNum.value) { clearTicketQrs(); expanded.value = ''; await load(targetPage) }
+async function loadAwards(targetPage = pageNum.value) {
+  clearTicketQrs(); expanded.value = ''
+  await Promise.all([load(targetPage), isApiMode() ? loadPointsContent().then(content => { exchangeDetails.value = content.details }).catch(() => { exchangeDetails.value = {} }) : Promise.resolve()])
+}
 function chooseTab(value) { tab.value = value; loadAwards(1) }
 onShow(() => loadAwards())
 onHide(clearTicketQrs)
@@ -155,6 +165,8 @@ async function loadRewardQrs() {
 </script>
 
 <style scoped>
+.award-use-info { padding: 4px 0 18px; font-size: 13px; line-height: 1.8; }
+.award-use-info > view { margin-top: 14px; }
 .award-top .grow, .award-small .grow { min-width: 0; }
 .award-top .section-title { font-size: 18px; line-height: 1.4; word-break: break-word; }
 .award-top > text { flex-shrink: 0; font-size: 13px; }

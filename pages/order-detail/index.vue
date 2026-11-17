@@ -47,6 +47,11 @@
             }}
           </text>
         </view>
+        <view v-if="paymentFailureDetail && order.status === 'pending'" class="payment-failure" role="alert">
+          <text class="strong">支付未完成</text>
+          <text selectable class="payment-failure-detail">{{ paymentFailureDetail }}</text>
+          <text class="muted small">联系客服时，请提供此提示和订单编号。</text>
+        </view>
         <view v-if="order.address" class="checkout-address">
           <AppIcon name="pin" tone="gold" :size="28" />
           <view class="column">
@@ -100,7 +105,7 @@
         <view v-else-if="delivery" class="delivery-card section-space">
           <view class="delivery-heading">
             <view class="row"><AppIcon name="truck" :size="19" /><text class="strong">物流信息</text></view>
-            <text class="muted small">{{ deliveryStatusLabel(delivery.status) }}</text>
+            <button class="text-button" @click="go('logistics', { id })">查看物流 <AppIcon name="arrow" :size="16" /></button>
           </view>
           <view class="delivery-number"><text>{{ delivery.company || '物流' }}</text><text class="muted">{{ delivery.trackingNo || '待填写单号' }}</text></view>
           <text v-if="delivery.syncError" class="muted small block delivery-sync-note">{{ delivery.syncError }}</text>
@@ -150,6 +155,10 @@
         <view class="info-line">
           <text>下单时间</text>
           <text>{{ dateLabel(order.createdAt) }}</text>
+        </view>
+        <view v-if="order.buyerRemark" class="info-line">
+          <text>买家留言</text>
+          <text class="order-buyer-remark">{{ order.buyerRemark }}</text>
         </view>
         <view class="notice section-space">
           <AppIcon name="info" :size="19" />
@@ -202,6 +211,7 @@ import {
 const id = ref(''),
   loading = ref(true),
   loadError = ref(''),
+  paymentFailureDetail = ref(''),
   busy = ref(false),
   delivery = ref(null),
   deliveryLoading = ref(false),
@@ -326,6 +336,7 @@ const orderItems = computed(() => {
 async function pay() {
   if (busy.value || order.value?.status !== 'pending') return
   busy.value = true
+  paymentFailureDetail.value = ''
   try {
     if (isApiMode()) {
       const fresh = await payOrder(id.value)
@@ -343,6 +354,7 @@ async function pay() {
     )
       await setOrderStatus(id.value, 'shipping')
   } catch (e) {
+    paymentFailureDetail.value = e.paymentDetail || e.message || '支付暂时无法完成，请联系客服'
     toast(e.message)
   } finally {
     busy.value = false
@@ -365,7 +377,7 @@ async function queryPayment() {
     const fresh = await syncPaymentOrder(id.value)
     if (fresh.status === 'pending') {
       const closed = ['CLOSED', 'REVOKED', 'PAYERROR'].includes(fresh.wechatTradeState)
-      toast(closed ? '微信交易已关闭或失败，请取消此订单后重新下单' : '微信尚未确认付款，请稍后查询或联系客服')
+      toast(closed ? '微信交易已关闭或失败，请取消此订单后重新下单' : !fresh.paymentAwaiting ? '微信确认尚未支付，可重新发起支付' : '微信尚未确认付款，请稍后查询或联系客服')
     }
     else {
       toast('订单状态已更新')
@@ -407,6 +419,8 @@ async function refund() {
 </script>
 
 <style scoped>
+.payment-failure { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.payment-failure-detail { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
 .order-shipping-store > text:first-child { flex: 0 0 auto; }
 .order-shipping-store > text:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .order-aftersale-links { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 24px; padding: 0 18px 20px; }
@@ -444,4 +458,5 @@ async function refund() {
 .order-skeleton-line--total { width: 48%; height: 18px; margin-top: 22px; margin-left: auto; }
 @keyframes order-skeleton-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 @keyframes delivery-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.order-buyer-remark { max-width: 70%; white-space: pre-wrap; overflow-wrap: anywhere; text-align: right; }
 </style>

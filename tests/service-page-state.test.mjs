@@ -20,7 +20,7 @@ test('service channels and QR codes read their own public data and clear stale v
     },
     '../../services/api.js': { get: async path => {
       paths.push(path)
-      if (path === '/mini/brand') return { officialAccountQr: '/official.png' }
+      if (path === '/mini/brand') return { officialAccountQr: '/official.png', customerServicePhone: '0775-7866298' }
       if (path === '/mini/channel') {
         if (channel instanceof Error) throw channel
         return channel
@@ -48,5 +48,6 @@ test('service channels and QR codes read their own public data and clear stale v
   route({ type: 'customer' })
   await page.loadService()
   assert.equal(page.serviceData.value.customerServiceQr, 'https://api.example.com/current.png')
-  assert.deepEqual(paths, ['/mini/channel', '/mini/channel', '/mini/brand', '/mini/channel'])
+  assert.equal(page.serviceData.value.phone, '0775-7866298')
+  assert.deepEqual(paths, ['/mini/channel', '/mini/channel', '/mini/brand', '/mini/channel', '/mini/brand'])
 })

@@ -35,7 +35,7 @@
         <text style="width: auto">设为默认地址</text>
         <switch
           :checked="form.isDefault"
-          color="#18382d"
+          color="#782d3b"
           @change="form.isDefault = $event.detail.value"
         />
       </view>

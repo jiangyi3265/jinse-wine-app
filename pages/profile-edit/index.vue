@@ -15,7 +15,7 @@
         </button>
         <!-- #endif -->
         <text class="identity-name">{{ name || '设置你的昵称' }}</text>
-        <text class="identity-note">{{ state.user.vip ? 'VIP会员' : '金色酒业会员' }}</text>
+        <text class="identity-note">{{ state.user.vip ? 'VIP会员' : '雄森酒业会员' }}</text>
       </view>
       <form @submit="save">
       <view class="profile-fields">
@@ -91,13 +91,13 @@ async function save(event) {
 .avatar-picker:after { border: 0; }
 .profile-avatar { width: 92px; height: 92px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 3px 14px #243c3020; }
 .avatar-edit-mark { position: absolute; right: -5px; bottom: -2px; padding: 3px 8px; border: 1px solid #fff; border-radius: 12px; background: #173b2d; color: #fff; font-size: 11px; line-height: 16px; }
-.identity-name { max-width: 100%; margin-top: 15px; color: #202924; font-size: 18px; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+.identity-name { max-width: 100%; margin-top: 15px; color: #232321; font-size: 18px; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
 .identity-note { margin-top: 4px; color: #858b83; font-size: 12px; }
 .profile-fields { border-top: 1px solid #e9ebe5; }
 .field-row { min-height: 58px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e9ebe5; }
 .field-label { width: 78px; flex: 0 0 78px; color: #59625a; font-size: 14px; }
 .required { color: #b53434; }
-.field-input, .field-value { flex: 1; min-width: 0; color: #202924; font-size: 15px; text-align: right; }
+.field-input, .field-value { flex: 1; min-width: 0; color: #232321; font-size: 15px; text-align: right; }
 .field-value { color: #81877f; }
 .save-button { width: 100%; height: 48px; margin-top: 28px !important; border-radius: 4px !important; background: #173b2d !important; color: #fff !important; font-size: 15px !important; font-weight: 600; line-height: 48px !important; }
 .profile-demo { display: block; margin-top: 12px; color: #969b94; font-size: 12px; text-align: center; }

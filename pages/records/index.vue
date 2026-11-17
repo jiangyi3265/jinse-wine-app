@@ -1,6 +1,8 @@
 <template>
   <PageShell :title="title">
     <view class="section">
+      <view v-if="type === 'points'" class="record-filters"><picker mode="date" fields="month" :value="month" @change="setMonth"><view class="month-picker">{{ month || '全部月份' }} ▾</view></picker><button v-if="month" class="text-button" @click="month = ''; loadRecords(1)">全部月份</button></view>
+      <view v-if="type === 'points'" class="filter-tabs"><button v-for="item in directions" :key="item.value" :class="['filter-tab', { active: direction === item.value }]" @click="direction = item.value; loadRecords(1)">{{ item.label }}</button></view>
       <view v-if="loading" class="records-loading" aria-label="正在加载记录">
         <view v-for="item in 3" :key="item" class="records-loading-row">
           <view class="records-loading-icon" />
@@ -81,9 +83,12 @@ import { useMemberList } from '../../services/member-list.js'
 import { isApiMode } from '../../services/config.js'
 import { money } from '../../services/pricing.js'
 import { go, dateLabel } from '../../services/navigation.js'
-const type = ref('draw')
+const type = ref('draw'), month = ref(''), direction = ref('all')
+const directions = [{value:'all',label:'全部'},{value:'income',label:'收入'},{value:'expense',label:'支出'}]
+function setMonth(event) { month.value = event.detail.value.slice(0, 7); loadRecords(1) }
 const domains = { draw: 'drawRecords', points: 'pointRecords', cash: 'redPackets', verification: 'verificationRecords', pickup: 'pickupRecords', commission: 'commissionRecords' }
 const { rows, total, pageNum, pageSize, loading, loadError, load } = useMemberList(() => domains[type.value], {
+  filters: () => type.value === 'points' ? { month: month.value, direction: direction.value } : {},
   demoRows: () => type.value === 'commission' ? state.promotion?.records || [] : state[domains[type.value]] || [],
 })
 onLoad((q) => {
@@ -156,4 +161,5 @@ function cashStatus(item) {
 .records-loading-line.wide { width: 94%; height: 15px; margin-top: 0; }
 .records-loading-value { width: 48px; height: 20px; }
 @keyframes records-skeleton { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.record-filters { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }.month-picker { padding: 10px 14px; border-radius: 8px; background: #f1efeb; font-size: 13px; }.section > .filter-tabs { margin-bottom: 20px; }
 </style>

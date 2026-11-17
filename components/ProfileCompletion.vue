@@ -87,17 +87,17 @@ async function save(event) {
 </script>
 
 <style scoped>
-.identity-mask { position: fixed; inset: 0; z-index: 1500; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, .48); }
-.identity-sheet { box-sizing: border-box; width: 100%; max-width: 560px; padding: 26px 24px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #fffdf8; }
-.identity-title { display: block; color: #18382c; font-size: 21px; font-weight: 600; }
-.identity-description { display: block; margin-top: 8px; color: #777b72; font-size: 13px; line-height: 1.6; }
-.identity-avatar-button { display: flex; flex-direction: column; align-items: center; width: 150px; margin: 22px auto 16px; padding: 0; background: transparent; color: #496353; font-size: 13px; line-height: 2.3; }
+.identity-mask { position: fixed; inset: 0; z-index: 1500; display: flex; align-items: flex-end; justify-content: center; background: rgba(35, 35, 33, .48); }
+.identity-sheet { box-sizing: border-box; width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto; padding: 26px 24px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #faf9f6; }
+.identity-title { display: block; color: #232321; font-size: 21px; font-weight: 600; }
+.identity-description { display: block; margin-top: 8px; color: #85817e; font-size: 13px; line-height: 1.6; }
+.identity-avatar-button { display: flex; flex-direction: column; align-items: center; width: 150px; margin: 22px auto 16px; padding: 0; background: transparent; color: #782d3b; font-size: 13px; line-height: 2.3; }
 .identity-avatar-button::after, .identity-later::after { border: 0; }
 .identity-avatar { width: 78px; height: 78px; border-radius: 50%; background: #eeeee6; }
-.identity-name-row { display: flex; align-items: center; gap: 20px; padding: 17px 0; border-top: 1px solid #e9e8df; border-bottom: 1px solid #e9e8df; color: #354337; font-size: 15px; }
+.identity-name-row { display: flex; align-items: center; gap: 20px; padding: 17px 0; border-top: 1px solid #e9e5e1; border-bottom: 1px solid #e9e5e1; color: #232321; font-size: 15px; }
 .identity-name-row input { flex: 1; min-width: 0; text-align: right; font-size: 15px; }
-.identity-save { margin-top: 22px; border-radius: 8px; background: #173b2d; color: #fff; font-size: 16px; line-height: 48px; }
-.identity-later { margin-top: 8px; background: transparent; color: #777b72; font-size: 14px; line-height: 40px; }
-.identity-footnote { display: block; text-align: center; color: #96998e; font-size: 12px; }
+.identity-save { margin-top: 22px; border-radius: 9px; background: #782d3b; color: #faf9f6; font-size: 16px; line-height: 48px; }
+.identity-later { margin-top: 8px; background: transparent; color: #85817e; font-size: 14px; line-height: 44px; }
+.identity-footnote { display: block; text-align: center; color: #85817e; font-size: 12px; }
 .identity-error { display: block; margin-top: 12px; color: #b34433; font-size: 13px; }
 </style>

@@ -13,11 +13,7 @@
     </view>
     <template v-else-if="store">
       <view class="store-hero">
-        <image :src="displayValue(config.brand.storeHeroImage, assetUrl('/static/design/hero-product.jpg', 'brand.store'))" mode="aspectFill" />
-        <view class="store-hero-copy">
-          <text class="serif">金色酒业</text>
-          <text class="store-hero-sub">传承酱香　酿造美好</text>
-        </view>
+        <image :src="store.image" mode="aspectFill" />
       </view>
       <view class="store-qr-content">
         <text class="store-name">{{ store.name }}</text>
@@ -48,17 +44,37 @@
         </view>
         <view v-if="store.hours" class="row muted small store-contact-line">
           <AppIcon name="clock" :size="20" />
-          <text>营业时间：{{ store.hours }}</text>
+          <text>营业时间：{{ businessHours }}</text>
         </view>
         <text v-if="missingServiceInfo(store)" class="store-service-note">{{ missingServiceInfo(store) }}</text>
+        <view v-if="canLocateStore(store)" class="store-map-entry">
+          <!-- #ifdef MP-WEIXIN -->
+          <map v-if="hasVerifiedStoreCoordinates(store)" class="store-detail-map" :latitude="Number(store.latitude)" :longitude="Number(store.longitude)" :scale="16" :markers="storeMarkers" @markertap="locateStore(store)" />
+          <!-- #endif -->
+          <view class="store-map-copy">
+            <AppIcon name="pin" :size="22" />
+            <view class="column grow">
+              <text class="strong">{{ hasVerifiedStoreCoordinates(store) ? '门店位置' : '按地址查找门店' }}</text>
+              <text class="small muted">{{ store.address }}</text>
+              <text v-if="!hasVerifiedStoreCoordinates(store)" class="store-map-hint">
+                <!-- #ifdef MP-WEIXIN -->
+                点击“地图查找”将复制地址并打开地图，粘贴搜索后选择门店即可导航。
+                <!-- #endif -->
+                <!-- #ifndef MP-WEIXIN -->
+                点击“地图查找”打开地图搜索，核对门店后即可导航。
+                <!-- #endif -->
+              </text>
+            </view>
+          </view>
+        </view>
         <view class="store-actions">
           <button class="btn btn-outline" :class="{ 'is-unavailable': !store.phone }" :disabled="!store.phone" @click="callStore(store)">
             <AppIcon name="phone" :size="22" />
             拨打电话
           </button>
-          <button class="btn" :class="{ 'is-unavailable': !hasStoreCoordinates(store) }" :disabled="!hasStoreCoordinates(store)" @click="locateStore(store)">
+          <button class="btn" :class="{ 'is-unavailable': !canLocateStore(store) }" :disabled="!canLocateStore(store)" @click="locateStore(store)">
             <AppIcon name="navigation" tone="light" :size="22" />
-            导航到店
+            {{ hasVerifiedStoreCoordinates(store) ? '导航到店' : '地图查找' }}
           </button>
         </view>
         <view class="packet-support">
@@ -79,20 +95,25 @@ import AppIcon from '../../components/AppIcon.vue'
 import QrCode from '../../components/QrCode.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { stores, loadStoreByCode } from '../../services/catalog.js'
-import { go, contact, callStore, locateStore, hasStoreCoordinates } from '../../services/navigation.js'
-import { config, displayValue, assetUrl, isApiMode } from '../../services/config.js'
-const id = ref(isApiMode() ? '' : 'guigang')
+import { go, contact, callStore, locateStore, hasVerifiedStoreCoordinates, canLocateStore } from '../../services/navigation.js'
+import { isApiMode } from '../../services/config.js'
+const id = ref(isApiMode() ? '' : stores[0]?.id || '')
 const loading = ref(true)
 const loadError = ref(false)
 const resolvedStore = ref(null)
 let storeTask
 onLoad((q) => {
-  id.value = q.id || (isApiMode() ? '' : 'guigang')
+  id.value = q.id || (isApiMode() ? '' : stores[0]?.id || '')
   if (id.value) loadStore()
   else loading.value = false
 })
 onShow(() => { if (id.value) loadStore() })
 const store = computed(() => isApiMode() ? resolvedStore.value : stores.find((s) => s.id === id.value))
+const businessHours = computed(() => String(store.value?.hours || '').replace(/^营业时间[:：\s]*/, ''))
+const storeMarkers = computed(() => hasVerifiedStoreCoordinates(store.value) ? [{
+  id: 1, latitude: Number(store.value.latitude), longitude: Number(store.value.longitude),
+  title: store.value.name, callout: { content: store.value.name, display: 'ALWAYS', padding: 8, borderRadius: 4 },
+}] : [])
 async function loadStore() {
   if (storeTask) return storeTask
   storeTask = (async () => {
@@ -108,12 +129,17 @@ async function loadStore() {
 function missingServiceInfo(store) {
   const missing = []
   if (!store.phone) missing.push('联系电话')
-  if (!hasStoreCoordinates(store)) missing.push('导航坐标')
+  if (!canLocateStore(store)) missing.push('门店位置')
   return missing.length ? `${missing.join('、')}暂未配置` : ''
 }
 </script>
 <style scoped>
 .store-contact-line { margin-top: 12px; }
+.store-map-entry { margin-top: 22px; overflow: hidden; border: 1px solid #dde5dd; border-radius: 12px; background: #f3f5ef; }
+.store-detail-map { width: 100%; height: 170px; }
+.store-map-copy { display: flex; gap: 10px; padding: 16px; color: #214b3a; }
+.store-map-copy .column { gap: 6px; min-width: 0; line-height: 1.6; }
+.store-map-hint { font-size: 12px; color: #68786e; }
 .store-loading { min-height: calc(100vh - 102px); background: #fbfaf6; }
 .store-loading-hero, .store-skeleton-line, .store-skeleton-qr, .store-skeleton-row { background: linear-gradient(100deg, #eeeae1 20%, #f8f5ee 38%, #eeeae1 56%); background-size: 300% 100%; animation: store-skeleton-shimmer 1.4s ease-in-out infinite; }
 .store-loading-hero { height: 220px; }

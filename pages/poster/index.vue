@@ -21,10 +21,10 @@
       <view class="poster-photo">
         <view class="poster-copy">
           <view class="poster-brand-row">
-            <text class="vip-brand">金色酒业</text>
+            <text class="vip-brand">雄森酒业</text>
             <text class="poster-brand-caption">甄选佳酿</text>
           </view>
-          <text class="poster-copy-label">GOLDEN CELLAR · 精选系列</text>
+          <text class="poster-copy-label">雄森精选 · 酒友推荐</text>
           <text class="poster-product-name">{{ featured.name }}</text>
           <view class="poster-product-meta">
             <text class="poster-spec">{{ featured.spec }}</text>
@@ -45,7 +45,7 @@
       <view class="poster-bottom">
         <view class="grow column poster-recommender">
           <text class="poster-recommender-name serif">{{ state.user.name || '酒友' }}的精选推荐</text>
-          <text class="muted small">{{ isApiMode() && !promotionCode && promotionInviteCode ? `邀请码：${promotionInviteCode}` : '长按识别，进入金色酒业' }}</text>
+          <text class="muted small">{{ isApiMode() && !promotionCode && promotionInviteCode ? `邀请码：${promotionInviteCode}` : '长按识别，进入雄森酒业' }}</text>
         </view>
         <QrCode :src="promotionCode" />
       </view>
@@ -177,7 +177,7 @@ const sharePath = computed(() => featured.value
   ? `/pages/product/index?id=${encodeURIComponent(featured.value.id)}${promotionInviteCode.value ? `&inviteCode=${encodeURIComponent(promotionInviteCode.value)}` : ''}`
   : '/pages/shop/index')
 onShareAppMessage(() => ({
-  title: `金色酒业 · ${featured.value?.name || '精选好酒'}`,
+  title: `雄森酒业 · ${featured.value?.name || '精选好酒'}`,
   path: canShare.value ? sharePath.value : '/pages/shop/index',
 }))
 function shareLink() {
@@ -217,7 +217,7 @@ async function savePoster() {
     // #ifdef H5
     const link = document.createElement('a')
     link.href = image.tempFilePath
-    link.download = '金色酒业-推广海报.png'
+    link.download = '雄森酒业-推广海报.png'
     link.click()
     toast('海报已生成')
     // #endif
@@ -246,23 +246,23 @@ function resolveCanvasImage(src) {
 <style scoped>
 .poster-intro { padding: 18px 20px 20px; }
 .poster-eyebrow { display: block; color: #977348; font-size: 11px; letter-spacing: 2px; }
-.poster-heading { display: block; margin-top: 8px; color: #213c30; font-size: 24px; font-weight: 650; }
+.poster-heading { display: block; margin-top: 8px; color: #232321; font-size: 24px; font-weight: 650; }
 .poster-intro-note { display: block; margin-top: 7px; color: #7b8077; font-size: 12px; }
 .poster-selector { display: flex; align-items: center; gap: 12px; margin: 0 18px 14px; padding: 13px 14px; border: 1px solid #e1e5dd; border-radius: 8px; background: #fff; }
 .poster-selector-copy { flex: 1; min-width: 0; }
 .poster-selector-label { display: block; color: #848b81; font-size: 10px; }
-.poster-selector-name { display: block; overflow: hidden; margin-top: 5px; color: #243e32; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.poster-selector-name { display: block; overflow: hidden; margin-top: 5px; color: #232321; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .poster-selector-action { flex-shrink: 0; color: #947243; font-size: 12px; }
 .poster-recommender { min-width: 0; }
 .poster-recommender-name { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
 .poster-recommender .small { margin-top: 6px; overflow-wrap: anywhere; }
 .poster-bottom :deep(.qr-block) { flex-shrink: 0; }
 .poster-price-note { display: block; padding: 0 16px 14px; color: #8a857a; font-size: 10px; }
-.poster-status { display: flex; align-items: center; gap: 10px; margin: 0 18px; padding: 13px 14px; border-radius: 8px; background: #eaf0e9; }
+.poster-status { display: flex; align-items: center; gap: 10px; margin: 0 18px; padding: 13px 14px; border-radius: 8px; background: #f1efeb; }
 .poster-status.needs-attention { background: #f4eddf; }
 .poster-status-copy { flex: 1; min-width: 0; }
-.poster-status-title { display: block; color: #365542; font-size: 12px; font-weight: 600; }
-.poster-status-note { display: block; margin-top: 4px; color: #72806f; font-size: 11px; line-height: 1.65; }
+.poster-status-title { display: block; color: #782d3b; font-size: 12px; font-weight: 600; }
+.poster-status-note { display: block; margin-top: 4px; color: #85817e; font-size: 11px; line-height: 1.65; }
 .poster-retry { flex-shrink: 0; margin: 0; padding: 0 9px; border: 1px solid #cbbc9e; border-radius: 5px; color: #806536; background: transparent; font-size: 11px; line-height: 30px; }
 .poster-retry::after { border: 0; }
 .poster-actions { padding-bottom: 22px; }

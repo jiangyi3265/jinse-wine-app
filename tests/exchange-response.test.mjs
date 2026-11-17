@@ -76,6 +76,20 @@ test('confirmed draw remains visible and actionable when follow-up reads fail', 
   assert.equal(memory.get('jinse-mini-request-ids-v1')?.['draw:CASH-31'], undefined)
 })
 
+test('electronic voucher remains in awards after a successful draw even if refresh fails', async () => {
+  responder = async options => {
+    if (options.method === 'POST') return { statusCode: 200, data: { code: 0, data: {
+      id: 'voucher-99', kind: 'voucher', name: '动物园门票', code: 'DR-XIONGSEN', pointBalance: 99,
+    } } }
+    throw new Error('refresh unavailable')
+  }
+  const result = await drawCode('XIONGSEN-VOUCHER-99')
+  assert.equal(result.kind, 'voucher')
+  assert.equal(state.awards[0].id, 'voucher-99')
+  assert.equal(state.drawRecords[0].rewardId, 'voucher-99')
+  assert.equal(state.points, 99)
+})
+
 test('goods and coupon draw entitlements remain visible when refresh fails', async () => {
   const results = [
     { id: '32', kind: 'goods', name: '品鉴杯', image: '/cup.jpg', pointBalance: 320 },

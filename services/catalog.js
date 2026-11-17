@@ -139,32 +139,70 @@ const demoExchangeProducts = [
 ]
 const demoStores = [
   {
-    id: 'guigang',
-    name: '金色酒业体验店',
-    city: '贵港',
-    district: '港北区',
-    address: '贵港市港北区金港大道 888 号金色酒业体验店',
+    id: 'XS-yatang',
+    name: '雄森酒业门市部',
+    province: '广西壮族自治区',
+    city: '贵港市',
+    district: '平南县',
+    address: '广西平南县雅塘街82号',
     distance: '—',
-    hours: '09:00 - 21:00',
-    image: '/static/design/product-classic.jpg',
-    phone: '13800002688',
-    latitude: 23.0965,
-    longitude: 109.6086,
+    hours: '营业时间请电话咨询',
+    image: 'https://jiuyekl.oksja.cn/profile/upload/products/catalog-detail-20261108/store-yatang.jpg',
+    phone: '0775-7866298',
+    latitude: 23.542,
+    longitude: 110.393,
+    locationSimulated: true,
     serviceQr: '',
     groupQr: '',
   },
   {
-    id: 'partner',
-    name: '金色酒业合作门店',
-    city: '贵港',
-    district: '港南区',
-    address: '贵港市港南区江南大道 188 号金色酒业合作门店',
+    id: 'XS-supermarket',
+    name: '雄森超市',
+    province: '广西壮族自治区',
+    city: '贵港市',
+    district: '平南县',
+    address: '广西平南县上渡工业园雄森旅游度假区门口',
     distance: '—',
-    hours: '09:00 - 21:00',
-    image: '/static/design/product-classic.jpg',
-    phone: '13800002689',
-    latitude: 23.0668,
-    longitude: 109.5945,
+    hours: '营业时间请电话咨询',
+    image: 'https://jiuyekl.oksja.cn/profile/upload/products/catalog-detail-20261108/store-supermarket.jpg',
+    phone: '19175590082',
+    latitude: 23.481,
+    longitude: 110.41,
+    locationSimulated: true,
+    serviceQr: '',
+    groupQr: '',
+  },
+  {
+    id: 'XS-hotel',
+    name: '雄景生态酒店1楼特产商店',
+    province: '广西壮族自治区',
+    city: '贵港市',
+    district: '平南县',
+    address: '广西平南县工业园雄景生态酒店1楼',
+    distance: '—',
+    hours: '营业时间请电话咨询',
+    image: 'https://jiuyekl.oksja.cn/profile/upload/products/catalog-detail-20261108/store-hotel.jpg',
+    phone: '0775-7803399',
+    latitude: 23.484,
+    longitude: 110.407,
+    locationSimulated: true,
+    serviceQr: '',
+    groupQr: '',
+  },
+  {
+    id: 'XS-tea',
+    name: '雄森黄金茶品鉴中心',
+    province: '广西壮族自治区',
+    city: '贵港市',
+    district: '平南县',
+    address: '广西平南县上渡工业园雄森旅游度假区内',
+    distance: '—',
+    hours: '营业时间请电话咨询',
+    image: 'https://jiuyekl.oksja.cn/profile/upload/products/catalog-detail-20261108/store-tea.jpg',
+    phone: '0775-7613333',
+    latitude: 23.479,
+    longitude: 110.414,
+    locationSimulated: true,
     serviceQr: '',
     groupQr: '',
   },
@@ -249,7 +287,7 @@ const normalizeBrand = (brand = {}, content = {}) => {
 let catalogTask
 const catalogRequest = async () => {
   return Promise.all([
-    get('/mini/products'), get('/mini/stores'), get('/mini/coupons/templates'),
+    get('/mini/products'), storeListWithLocations(), get('/mini/coupons/templates'),
     get('/mini/exchanges'),
   ])
 }
@@ -330,9 +368,20 @@ export function loadProductShipping(code, quantity = 1, skuCode = '') {
   return get(`/mini/products/${encodeURIComponent(code)}/shipping-quote?quantity=${quantity}&skuCode=${encodeURIComponent(skuCode)}`)
 }
 
+async function storeLocationMetadata() {
+  try { return (await get('/mini/content/stores.locations'))?.content || {} }
+  catch (error) { if (Number(error.statusCode) === 404) return {}; throw error }
+}
+function applyStoreLocation(item, metadata) {
+  return { ...item, locationSimulated: metadata[item.id]?.simulated === true }
+}
+async function storeListWithLocations() {
+  const [items, metadata] = await Promise.all([get('/mini/stores'), storeLocationMetadata()])
+  return (items || []).map(item => applyStoreLocation(item, metadata))
+}
 export async function loadStoreCatalog() {
   if (!isApiMode()) return
-  replace(stores, ((await get('/mini/stores')) || []).map((item) =>
+  replace(stores, (await storeListWithLocations()).map((item) =>
     normalizeMedia({ ...item, distance: item.distance ?? '—' })))
 }
 
@@ -371,6 +420,6 @@ export async function loadCatalog() {
 
 export async function loadStoreByCode(code) {
   if (!isApiMode()) return stores.find((store) => store.id === code) || null
-  const item = await get(`/mini/stores/${encodeURIComponent(code)}`)
-  return item ? normalizeMedia(item) : null
+  const [item, metadata] = await Promise.all([get(`/mini/stores/${encodeURIComponent(code)}`), storeLocationMetadata()])
+  return item ? normalizeMedia(applyStoreLocation(item, metadata)) : null
 }
