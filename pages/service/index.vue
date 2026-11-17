@@ -15,7 +15,7 @@
         <text class="section-title serif">{{ title }}</text>
         <text class="muted">
           {{
-            type === 'customer' ? '为您解答商品、订单与活动问题' : '查看金色酒业品牌内容与活动消息'
+            type === 'customer' ? '为您解答商品、订单与活动问题' : '查看雄森酒业品牌内容与活动消息'
           }}
         </text>
       </view>
@@ -33,6 +33,7 @@
         <text v-else-if="!loading && !loadError && !serviceData.videoLiveFeedId && !serviceData.videoFeedId" class="center block muted channel-note">直播与短视频入口尚未配置</text>
       </template>
       <template v-else>
+        <button v-if="serviceData.phone" class="service-phone" @click="callService"><AppIcon name="phone" tone="brand" :size="23" /><view class="grow"><text class="strong block">{{ serviceData.phone }}</text><text class="muted small">雄森酒业服务热线</text></view><AppIcon name="chevron" :size="16" /></button>
         <!-- #ifdef MP-WEIXIN -->
         <button class="btn" open-type="contact">联系在线客服</button>
         <!-- #endif -->
@@ -86,6 +87,7 @@ async function loadService() {
   if (!isApiMode()) {
     serviceData.value = {
       officialQr: config.officialAccountQr, customerServiceQr: config.customerServiceQr,
+      phone: config.brand?.customerServicePhone || '',
       finderUserName: config.finderUserName, videoLiveFeedId: config.videoLiveFeedId,
       videoLiveNonceId: config.videoLiveNonceId, videoFeedId: config.videoFeedId,
       videoNonceId: config.videoNonceId,
@@ -107,11 +109,19 @@ async function loadService() {
         videoFeedId: channels['wechat.video.feedId'] || '',
         videoNonceId: channels['wechat.video.nonceId'] || '',
       }
+      if (type.value === 'customer') {
+        const brand = await get('/mini/brand') || {}
+        serviceData.value.phone = brand.customerServicePhone || ''
+      }
     }
   } catch (error) { loadError.value = error.message || '服务资料暂时无法加载' }
   finally { loading.value = false }
 }
 onShow(loadService)
+function callService() {
+  if (!serviceData.value.phone) return
+  uni.makePhoneCall({ phoneNumber: serviceData.value.phone, fail: () => toast('暂时无法拨打，请稍后再试') })
+}
 const title = computed(() =>
   type.value === 'official' ? '品牌公众号' : type.value === 'channels' ? '品牌视频号' : '在线客服',
 )
@@ -163,4 +173,6 @@ function openVideo() {
 .service-error { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px; font-size: 13px; }
 .service-error .text-button { flex: 0 0 auto; }
 .btn:disabled { box-shadow: none; }
+.service-phone { display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px; margin: 0 0 16px; background: #f1efeb; text-align: left; border-radius: 12px; }
+.service-phone .strong { font-size: 20px; margin-bottom: 4px; }
 </style>

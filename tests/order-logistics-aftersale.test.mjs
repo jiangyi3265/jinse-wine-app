@@ -9,9 +9,9 @@ function harness(handler = async () => ({})) {
   const order = { id: 'order-1', status: 'receiving', items: [{ orderItemId: 11, name: '测试酒', quantity: 3 }] }
   const page = loadPageScript('aftersale', {
     vue, '@dcloudio/uni-app': { onLoad() {}, onShow() {} },
-    '../../services/api.js': { request: async (path, options) => { calls.push({ path, options }); return handler(path, options) } },
+    '../../services/api.js': { upload: async () => ({url:'/profile/upload/test.jpg'}), request: async (path, options) => { calls.push({ path, options }); return handler(path, options) } },
     '../../services/store.js': { refreshOrder: async () => order },
-    '../../services/config.js': { isApiMode: () => true },
+    '../../services/config.js': { isApiMode: () => true, mediaUrl: value => value },
     '../../services/navigation.js': { confirm: async () => true, dateLabel: String, toast: message => messages.push(message) },
     '../../services/pricing.js': { money: String },
   })

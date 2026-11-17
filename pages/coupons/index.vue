@@ -123,7 +123,7 @@ const selecting = computed(() => mode.value === 'select'),
   )
 const lines = computed(() => {
   if (selecting.value && source.value === 'cart')
-    return (state.cart || []).map(item => ({
+    return (state.cart || []).filter(item => !state.checkout.cartItemIds || state.checkout.cartItemIds.includes(String(item.id))).map(item => ({
       productId: item.productId,
       price: Number(item.price),
       quantity: Number(item.quantity),

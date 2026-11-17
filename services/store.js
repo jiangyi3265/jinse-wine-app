@@ -4,6 +4,7 @@ import { quoteOrder } from './pricing.js'
 import { config, mediaUrl } from './config.js'
 import { get, post, patch, request, upload } from './api.js'
 import { offerProfileCompletion } from './profile-completion.js'
+import { paymentFailure } from './payment-error.js'
 
 const KEY = 'jinse-frontend-v3-state-1'
 const REQUEST_KEY = 'jinse-mini-request-ids-v1'
@@ -339,6 +340,11 @@ export async function refreshOrder(id) {
 export async function syncPaymentOrder(id) {
   if (config.mode !== 'api') throw new Error('当前为演示模式')
   const order = normalizeOrder(await post(`/mini/orders/${encodeURIComponent(id)}/pay-sync`, {}, true))
+  // Only the server's signed WeChat query can unlock an uncertain payment.
+  if (order.status === 'pending' && ['NOTPAY', 'NOT_FOUND'].includes(order.wechatTradeState)) {
+    clearPaymentAwaiting(id)
+    order.paymentAwaiting = false
+  }
   state.orders = [order, ...state.orders.filter((item) => item.id !== order.id)]
   return order
 }
@@ -363,6 +369,7 @@ export function updateProfile(name, phone) {
 }
 
 export function quoteCheckout() {
+  if (state.checkout.source === 'cart') return quoteCartOrder()
   if (config.mode !== 'api') return null
   const { productId, skuCode, quantity, couponId, addressId, fulfillmentMode, pickupStoreId } = state.checkout
   if (!productId || (fulfillmentMode === 'pickup' ? !pickupStoreId : !addressId)) return Promise.reject(new Error(fulfillmentMode === 'pickup' ? '请选择自提门店' : '请先选择商品和收货地址'))
@@ -417,16 +424,15 @@ export async function payOrder(id) {
     await uni.requestPayment(params)
   } catch (error) {
     const cancelled = String(error?.errMsg || '').includes('cancel')
+    markPaymentAwaiting(id)
     let order
-    try { order = await refreshOrder(id) }
+    try { order = await syncPaymentOrder(id) }
     catch {
-      markPaymentAwaiting(id)
-      throw new Error('支付结果暂未核实，请稍后查询订单状态')
+      throw paymentFailure(error, true)
     }
     if (order.status !== 'pending') return order
-    if (cancelled) { clearPaymentAwaiting(id); return { ...order, paymentCancelled: true } }
-    markPaymentAwaiting(id)
-    throw new Error('支付结果暂未核实，请稍后查询订单状态')
+    if (cancelled && !order.paymentAwaiting) return { ...order, paymentCancelled: true }
+    throw paymentFailure(error, order.paymentAwaiting)
   }
   // 微信界面返回成功不等于服务端支付回调已确认。
   markPaymentAwaiting(id)
@@ -458,13 +464,13 @@ export async function drawCode(code) {
       id: `draw-${requestId}`,
       title: result.title || result.name || '谢谢参与',
       value: result.value || (result.kind === 'cash' ? `¥${(Number(result.amount) / 100).toFixed(2)}` : result.name),
-      rewardId: ['cash', 'goods', 'ticket'].includes(result.kind) ? result.id : undefined,
+      rewardId: ['cash', 'goods', 'ticket', 'voucher'].includes(result.kind) ? result.id : undefined,
       couponId: result.kind === 'coupon' ? result.id : undefined,
     }
     state.drawRecords = [record, ...state.drawRecords.filter(value => String(value.id) !== record.id)]
     const balance = Number(result.pointBalance)
     if (result.pointBalance != null && Number.isSafeInteger(balance)) state.points = balance
-    if (['goods', 'ticket'].includes(result.kind)) state.awards = [{ ...result, image: mediaUrl(result.image) }, ...state.awards.filter(value => String(value.id) !== String(result.id))]
+    if (['goods', 'ticket', 'voucher'].includes(result.kind)) state.awards = [{ ...result, image: mediaUrl(result.image) }, ...state.awards.filter(value => String(value.id) !== String(result.id))]
     if (result.kind === 'coupon' && result.templateId) {
       const coupon = normalizeCoupon(result)
       state.coupons = [coupon, ...state.coupons.filter(value => String(value.id) !== coupon.id)]
@@ -552,10 +558,19 @@ export function exchangeReward(id) {
   persist()
   return item.kind
 }
+export function prepareCartCheckout(ids) {
+  if (!Array.isArray(ids) || !ids.length) throw new Error('请先勾选商品')
+  state.checkout = { ...state.checkout, source: 'cart', cartItemIds: ids.map(String), buyerRemark: '', couponId: null, cartRequestId: '', cartRequestSignature: '' }
+  persist()
+}
+export function selectedCartItems() {
+  return (state.cart || []).filter(item => !state.checkout.cartItemIds || state.checkout.cartItemIds.includes(String(item.id)))
+}
 export function prepareCheckout(productId, quantity = 1, skuCode = '') {
   const product = getProduct(productId)
   if (!product) throw new Error('商品不存在')
   state.checkout = {
+    source: 'product', buyerRemark: '',
     productId,
     skuCode,
     quantity,
@@ -572,11 +587,13 @@ export function prepareCheckout(productId, quantity = 1, skuCode = '') {
   persist()
 }
 export function submitOrder() {
+  if (state.checkout.source === 'cart') return submitCartOrder()
   if (config.mode === 'api') {
     const draft = state.checkout
     if (!draft.productId || !draft.requestId) throw new Error('请重新选择商品')
     if (draft.fulfillmentMode === 'pickup' ? !draft.pickupStoreId : !draft.addressId) throw new Error(draft.fulfillmentMode === 'pickup' ? '请选择自提门店' : '请先填写收货地址')
     return post('/mini/orders', {
+      buyerRemark: draft.buyerRemark || '',
       productId: draft.productId, quantity: draft.quantity,
       skuCode: draft.skuCode || '',
       couponId: draft.couponId, addressId: draft.addressId, fulfillmentMode: draft.fulfillmentMode || 'delivery', pickupStoreId: draft.pickupStoreId, requestId: draft.requestId,
@@ -781,6 +798,7 @@ export function quoteCartOrder() {
   const addressId = (state.addresses.find(address => address.id === state.checkout.addressId)
     || state.addresses.find(address => address.isDefault) || state.addresses[0])?.id
   return post('/mini/orders/cart/quote', {
+    cartItemIds: state.checkout.cartItemIds,
     addressId,
     couponId: state.checkout.couponId || null,
     fulfillmentMode: mode,
@@ -798,8 +816,8 @@ export function submitCartOrder() {
   }
   const couponId = state.checkout.couponId || null
   const cartSignature = JSON.stringify({
-    items: (state.cart || []).map(item => ({ id: item.id, productId: item.productId, skuCode: item.skuCode || '', quantity: item.quantity })).sort((left, right) => String(left.id).localeCompare(String(right.id))),
-    mode, addressId: addressId || null, pickupStoreId: pickupStoreId || null, couponId,
+    items: selectedCartItems().map(item => ({ id: item.id, productId: item.productId, skuCode: item.skuCode || '', quantity: item.quantity })).sort((left, right) => String(left.id).localeCompare(String(right.id))),
+    buyerRemark: state.checkout.buyerRemark || '', mode, addressId: addressId || null, pickupStoreId: pickupStoreId || null, couponId,
   })
   // 保留同一购物车结算请求号，网络结果未知时重试不会重复创建订单；结算内容变化后自动换新请求号。
   if (state.checkout.cartRequestSignature !== cartSignature || !state.checkout.cartRequestId) {
@@ -807,13 +825,13 @@ export function submitCartOrder() {
     state.checkout.cartRequestId = uid('cart-order')
   }
   const requestId = state.checkout.cartRequestId
-  return post('/mini/orders/cart', { addressId, couponId, requestId, fulfillmentMode: mode, pickupStoreId }, true, requestId)
+  return post('/mini/orders/cart', { addressId, couponId, requestId, fulfillmentMode: mode, pickupStoreId, cartItemIds: state.checkout.cartItemIds, buyerRemark: state.checkout.buyerRemark || '' }, true, requestId)
     .then(orderData => {
       const order = normalizeOrder(orderData)
       state.orders = [order, ...state.orders.filter(item => item.id !== order.id)]
       const coupon = state.coupons.find(item => item.id === couponId)
       if (coupon) { coupon.status = 'locked'; coupon.orderId = order.id }
-      state.cart = []
+      state.cart = state.checkout.cartItemIds ? state.cart.filter(item => !state.checkout.cartItemIds.includes(String(item.id))) : []
       state.checkout.cartRequestId = ''
       state.checkout.cartRequestSignature = ''
       void Promise.allSettled([refreshDomain('coupons'), loadCart()])

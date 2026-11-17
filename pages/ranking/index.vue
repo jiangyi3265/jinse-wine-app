@@ -10,9 +10,18 @@
           排行规则 →
         </button>
       </view>
+      <view v-if="ranking.length" class="rank-podium">
+        <view v-for="(item, index) in ranking.slice(0, 3)" :key="item.id || item.name" class="podium-card" :class="`rank-${index + 1}`">
+          <AppIcon name="crown" :tone="index === 0 ? 'light' : 'gold'" :size="22" />
+          <view class="rank-avatar">{{ item.initial || (item.name || '').slice(0, 1) }}</view>
+          <text class="block podium-name">{{ item.name }}</text>
+          <text class="small block">第 {{ index + 1 }} 名</text>
+          <text class="block podium-amount">¥{{ ((item.amount || item.commission || 0) / 100).toFixed(2) }}</text>
+        </view>
+      </view>
       <view class="rank-list">
-        <view v-for="(item, index) in ranking" :key="item.id || item.name" class="rank-row">
-          <text class="rank-number">0{{ index + 1 }}</text>
+        <view v-for="(item, index) in ranking.slice(3)" :key="item.id || item.name" class="rank-row">
+          <text class="rank-number">{{ index + 4 }}</text>
           <view class="rank-avatar">{{ item.initial || (item.name || '').slice(0, 1) }}</view>
           <text class="grow">{{ item.name }}</text>
           <text class="amount">
@@ -54,6 +63,7 @@
 </template>
 <script setup>
 import PageShell from '../../components/PageShell.vue'
+import AppIcon from '../../components/AppIcon.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { ranks } from '../../services/catalog.js'
 import { state, refreshDomain } from '../../services/store.js'

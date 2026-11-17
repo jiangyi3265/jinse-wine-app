@@ -56,6 +56,13 @@
       <button class="text-button" @click="loadProfile">重新加载</button>
     </view>
     <view v-if="!profileLoading && !profileError" class="profile-content">
+      <button class="vip-banner" @click="signedIn ? go('vip') : handleLogin()">
+        <view>
+          <text class="serif block">VIP社群</text>
+          <text class="small">与知味之人，共赴佳酿之约</text>
+        </view>
+        <text class="small">查看会员活动 →</text>
+      </button>
       <view class="section-heading">
         <text class="section-title serif">我的订单</text>
         <button class="text-button muted" @click="signedIn ? go('orders') : handleLogin()">
@@ -73,25 +80,11 @@
           <text>{{ item.name }}</text>
         </button>
       </view>
-      <button class="vip-banner" @click="signedIn ? go('vip') : handleLogin()">
-        <view>
-          <text class="serif block">VIP社群</text>
-          <text class="small">与知味之人，共赴佳酿之约</text>
-        </view>
-        <text class="small">查看会员活动 →</text>
-      </button>
-      <button
-        v-for="item in entries"
-        :key="item.name"
-        class="link-row"
-        @click="signedIn || ['stores', 'service'].includes(item.route) ? go(item.route, item.query || {}) : handleLogin()"
-      >
-        <view class="grow">
-          <AppIcon :name="item.icon" :size="20" />
-          <text>{{ item.name }}</text>
-        </view>
-        <AppIcon name="chevron" :size="16" />
-      </button>
+      <view class="profile-entry-grid">
+        <button v-for="item in entries" :key="item.name" class="profile-entry" @click="signedIn || ['stores', 'service'].includes(item.route) ? go(item.route, item.query || {}) : handleLogin()">
+          <AppIcon :name="item.icon" :size="24" /><text>{{ item.name }}</text>
+        </button>
+      </view>
       <button v-if="signedIn && state.user.role === 'staff'" class="link-row" @click="go('verification')">
         <view class="grow">
           <AppIcon name="bag" :size="20" />
@@ -198,8 +191,8 @@ const entries = [
 </script>
 
 <style scoped>
-.profile-loading { min-height: calc(100vh - 44px); background: #fafaf7; }
-.profile-loading-hero { min-height: 272px; padding: 26px 20px 0; background: #102b22; }
+.profile-loading { min-height: calc(100vh - 44px); background: #faf9f6; }
+.profile-loading-hero { min-height: 272px; padding: 26px 20px 0; background: #782d3b; }
 .profile-loading-avatar, .profile-loading-line, .profile-loading-slogan, .profile-loading-stat, .profile-loading-heading, .profile-loading-order, .profile-loading-banner, .profile-loading-link { background: linear-gradient(100deg, rgba(255,255,255,.1) 20%, rgba(255,255,255,.22) 40%, rgba(255,255,255,.1) 60%); background-size: 300% 100%; animation: profile-skeleton-shimmer 1.4s ease-in-out infinite; }
 .profile-loading-avatar { width: 70px; height: 70px; border-radius: 50%; opacity: .65; }
 .profile-loading-copy { position: absolute; left: 110px; margin-top: -62px; }

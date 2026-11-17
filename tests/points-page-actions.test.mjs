@@ -25,6 +25,7 @@ test('exchange actions reflect balance, stock and in-flight state', async () => 
       go() {}, toast: message => messages.push(message), confirm: async () => true,
     },
     '../../services/config.js': { isApiMode: () => true, assetUrl: String },
+    '../../services/points-content.js': { loadPointsContent: async () => ({ guide: [{ heading: '消费累积', lines: ['实付每满1元积1分'] }], details: { coupon: { venue: '使用地点', sections: [], images: [{ url: '/voucher.jpg' }] } } }) },
   })
 
   assert.equal(page.hasStock(items[0]), true)
@@ -37,7 +38,19 @@ test('exchange actions reflect balance, stock and in-flight state', async () => 
   assert.equal(exchanged, 0)
   assert.deepEqual(messages, ['积分不足，暂时无法兑换', '该奖品已兑完'])
 
+  await page.loadPoints()
+  assert.equal(page.guide.value[0].heading, '消费累积')
+  page.openDetails(items[0])
+  assert.equal(page.detailReward.value.id, 'coupon', 'insufficient points must not block reading voucher details')
+  assert.equal(page.detailImages.value[0].url, '/voucher.jpg')
+  page.confirmFromDetails()
+  assert.equal(page.selectedReward.value, null, 'reading details must not bypass the balance check')
+
   state.points = 500
+  page.confirmFromDetails()
+  assert.equal(page.selectedReward.value.id, 'coupon')
+  assert.equal(page.detailReward.value, null)
+  assert.equal(exchanged, 0, 'continue only opens confirmation; it does not redeem')
   assert.equal(page.exchangeLabel(items[0]), '兑换')
   page.busy.value = items[0].id
   assert.equal(page.exchangeLabel(items[0]), '兑换中')

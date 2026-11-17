@@ -16,7 +16,7 @@ const paths = {
  wechat:'<path d="M14 13c0-5 9-5 9 0 0 2-1 3-2 4v3l-3-2c-4 1-6-1-6-3"/><path d="M18 7C16-1 1 0 1 9c0 3 2 5 4 6v4l4-3h2"/><circle cx="6" cy="8" r=".6"/><circle cx="12" cy="8" r=".6"/>',crown:'<path d="m2 6 5 4 5-7 5 7 5-4-3 14H5L2 6Zm3 11h14"/>',export:'<path d="M5 10H2v12h20V10h-3M12 17V2m-5 5 5-5 5 5"/>',close:'<path d="m5 5 14 14M5 19 19 5"/>',location:'<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/>',
 }
 await mkdir('static/icons',{recursive:true})
-for(const [name,path] of Object.entries(paths))for(const [tone,color] of Object.entries({ink:'#182D28',muted:'#707680',gold:'#C0AA7D',light:'#F7F7F2'})){
+for(const [name,path] of Object.entries(paths))for(const [tone,color] of Object.entries({ink:'#232321',muted:'#85817E',gold:'#A78D65',light:'#FAF9F6',brand:'#782D3B'})){
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="${color}" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`
  await sharp(Buffer.from(svg)).png().toFile(`static/icons/${name}-${tone}.png`)
 }

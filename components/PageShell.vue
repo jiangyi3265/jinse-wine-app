@@ -1,6 +1,6 @@
 <template>
   <view class="page-shell" :class="[{ 'with-tabs': active, 'with-footer': footer }, pageClass]">
-    <view class="app-header" :class="{ 'header-dark': dark }">
+    <view class="app-header" :class="{ 'header-sticky': stickyHeader }">
       <view class="status-bar" :style="{ height: statusHeight + 'px' }">
         <!-- #ifdef H5 -->
         <text>9:41</text>
@@ -18,7 +18,7 @@
       </view>
       <view class="navigation-bar" :style="{ height: navigationHeight + 'px' }">
         <button v-if="backButton" class="icon-button back-button" aria-label="返回" @click="back">
-          <AppIcon name="back" :size="25" :tone="dark ? 'light' : 'ink'" />
+          <AppIcon name="back" :size="25" tone="ink" />
         </button>
         <text class="nav-title" :class="{ 'nav-brand': brand, 'nav-left': left }">{{ title }}</text>
         <button
@@ -27,7 +27,7 @@
           aria-label="搜索商品"
           @click="go('shop')"
         >
-          <AppIcon name="search" :tone="dark ? 'light' : 'ink'" />
+          <AppIcon name="search" tone="ink" />
         </button>
         <!-- #ifdef H5 -->
         <view class="wechat-capsule" aria-hidden="true">
@@ -50,7 +50,7 @@
         @click="go(item.id)"
       >
         <view class="tab-icon" :class="{ 'tab-icon-active': active === item.id }">
-          <AppIcon :name="item.icon" :tone="active === item.id ? 'ink' : 'muted'" :size="24" />
+          <AppIcon :name="item.icon" :tone="active === item.id ? 'brand' : 'ink'" :size="24" />
         </view>
         <text>{{ item.label }}</text>
       </button>
@@ -70,10 +70,11 @@ defineProps({
   left: Boolean,
   search: Boolean,
   footer: Boolean,
+  stickyHeader: Boolean,
   backButton: { type: Boolean, default: true },
 })
 let statusHeight = 30,
-  navigationHeight = 60
+  navigationHeight = 44
 // #ifdef MP-WEIXIN
 const info = uni.getSystemInfoSync()
 statusHeight = info.statusBarHeight || 20
@@ -88,3 +89,6 @@ const tabs = [
   { id: 'profile', label: '我的', icon: 'user' },
 ]
 </script>
+<style scoped>
+.header-sticky { position: sticky; top: 0; z-index: 30; }
+</style>

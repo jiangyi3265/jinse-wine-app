@@ -81,6 +81,7 @@ function awardsHarness({ qr = async id => '/qr-' + id, ticketQr = async () => ({
     '../../services/product-media.js': { productImage: value => value || '/placeholder.png' },
     '../../services/api.js': { get: ticketQr },
     '../../services/ticket-code.js': { ticketImageSource: async value => value, removeTicketImage() {} },
+    '../../services/points-content.js': { loadPointsContent: async () => ({ details: {} }), rewardExchangeDetail: () => null },
   })
   return { page, calls, list }
 }

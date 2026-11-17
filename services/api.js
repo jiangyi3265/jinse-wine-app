@@ -177,7 +177,7 @@ export async function upload(path, filePath, fieldName = 'file') {
       timeout: 30000,
     })
   } catch {
-    throw new Error('头像上传失败，请检查网络后重试')
+    throw new Error('图片上传失败，请检查网络后重试')
   }
   let body = response.data
   if (typeof body === 'string') {

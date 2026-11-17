@@ -25,7 +25,8 @@
       "path": "pages/product/index",
       "style": {
         "navigationBarTitleText": "商品详情",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white"
       }
     },
     {
@@ -127,6 +128,13 @@
       }
     },
     {
+      "path": "pages/logistics/index",
+      "style": {
+        "navigationBarTitleText": "物流详情",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/aftersale/index",
       "style": {
         "navigationBarTitleText": "退货换货",
@@ -213,7 +221,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "金色酒业",
+    "navigationBarTitleText": "雄森酒业",
     "navigationStyle": "custom",
     "navigationBarBackgroundColor": "#FAFAF7",
     "backgroundColor": "#FAFAF7"

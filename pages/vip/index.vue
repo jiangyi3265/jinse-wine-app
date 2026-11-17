@@ -2,17 +2,17 @@
   <PageShell title="VIP社群">
     <view class="vip-card">
       <view class="vip-card-inner">
-        <text class="vip-brand block">金色酒业</text>
+        <text class="vip-brand block">雄森酒业</text>
         <text class="small">酿造美好生活</text>
         <text class="vip-title block">VIP社群</text>
         <text>以酒会友 · 臻享不凡</text>
         <view class="vip-benefits">
           <view class="row">
-            <AppIcon name="gift" tone="light" :size="24" />
+            <AppIcon name="gift" tone="gold" :size="24" />
             新品与促销活动
           </view>
           <view class="row">
-            <AppIcon name="bell" tone="light" :size="24" />
+            <AppIcon name="bell" tone="gold" :size="24" />
             优惠券与积分兑换提醒
           </view>
         </view>
@@ -153,7 +153,7 @@ async function subscribeNotifications() {
 <style scoped>
 .subscribe-section { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .subscribe-copy { min-width: 0; flex: 1; }
-.subscribe-button { flex: 0 0 auto; margin: 0; padding: 0 18px; min-height: 40px; color: #fff; background: #245a4a; border-radius: 6px; font-size: 14px; }
+.subscribe-button { flex: 0 0 auto; margin: 0; padding: 0 18px; min-height: 44px; color: #fff; background: #782d3b; border-radius: 8px; font-size: 14px; }
 .subscribe-button::after { border: 0; }
 .campaign-list { display: grid; gap: 10px; margin: 14px 0 8px; }
 .campaign-loading { display: grid; gap: 10px; margin: 14px 0 8px; }
@@ -167,7 +167,7 @@ async function subscribeNotifications() {
 .campaign-type { flex: 0 0 auto; color: #8b6440; font-size: 12px; }
 .campaign-content { display: block; margin-top: 6px; color: #68766e; font-size: 13px; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; }
 .campaign-empty { padding: 16px 0 8px; color: #98a19c; font-size: 13px; }
-.campaign-link { margin: 10px 0 0; padding: 0; color: #245a4a; background: transparent; font-size: 13px; text-align: left; line-height: 1.5; }
+.campaign-link { margin: 10px 0 0; padding: 0; color: #782d3b; background: transparent; font-size: 13px; text-align: left; line-height: 1.5; }
 .campaign-link::after { border: 0; }
 .group-qr-retry { width: auto; margin: 8px auto 0; padding: 5px 12px; border: 1px solid #bca16f; border-radius: 5px; color: #e6d1a1; background: transparent; font-size: 12px; line-height: 1.5; }
 .group-qr-retry::after { border: 0; }

@@ -9,7 +9,6 @@
 </template>
 <script setup>
 import { computed } from 'vue'
-import { isApiMode, mediaUrl } from '../services/config.js'
 
 const props = defineProps({
   name: { type: String, default: 'arrow' },
@@ -18,7 +17,7 @@ const props = defineProps({
 })
 const iconSource = computed(() => {
   const localPath = `/static/icons/${props.name}-${props.tone}.png`
-  return isApiMode() ? mediaUrl(localPath.replace('/static/', '/mini-assets/')) : localPath
+  return localPath
 })
 </script>
 <style scoped>

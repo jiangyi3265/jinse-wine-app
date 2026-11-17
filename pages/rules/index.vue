@@ -5,7 +5,7 @@
       <text>{{ loadError }}</text>
       <button class="text-button" @click="loadRules">重新加载</button>
     </view>
-    <view v-else-if="isApiMode() && !content.length" class="rules-status">规则暂未配置</view>
+    <view v-else-if="isApiMode() && !content.length && !remoteTable?.rows.length" class="rules-status">规则暂未配置</view>
     <view v-else class="rules-copy">
       <template v-if="type === 'coupon' && !isApiMode()">
         <text class="section-title">{{ coupon?.name || '优惠券使用说明' }}</text>
@@ -27,6 +27,10 @@
         <text class="section-title">{{ section.heading }}</text>
         <text v-for="line in section.lines" :key="line">{{ line }}</text>
       </template>
+      <view v-if="remoteTable?.rows.length" class="rules-page-table">
+        <view class="rules-page-row rules-page-head"><text v-for="(column, index) in remoteTable.columns" :key="index">{{ column }}</text></view>
+        <view v-for="(row, index) in remoteTable.rows" :key="index" class="rules-page-row"><text v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</text></view>
+      </view>
     </view>
   </PageShell>
 </template>
@@ -37,38 +41,30 @@ import PageShell from '../../components/PageShell.vue'
 import { getCouponTemplate } from '../../services/catalog.js'
 import { isApiMode } from '../../services/config.js'
 import { get } from '../../services/api.js'
+import { normalizeRuleContent } from '../../services/rules-content.js'
 const type = ref('coupon'),
   id = ref('')
 const loading = ref(isApiMode())
 const loadError = ref('')
 const remoteContent = ref([])
+const remoteTable = ref(null)
 onLoad((q) => {
   type.value = q.type || 'coupon'
   id.value = q.id || ''
 })
-function ruleSections(raw) {
-  let parsed = raw
-  if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed) } catch { return [] }
-  }
-  const sections = Array.isArray(parsed) ? parsed : parsed?.[type.value]
-  if (!Array.isArray(sections)) return []
-  return sections.map(section => ({
-    heading: section.heading || section.title || '规则说明',
-    lines: Array.isArray(section.lines) ? section.lines : [section.text || ''],
-  }))
-}
 async function loadRules() {
   if (!isApiMode()) return
   loading.value = true
   loadError.value = ''
   remoteContent.value = []
+  remoteTable.value = null
   const [brandResult, contentResult] = await Promise.allSettled([get('/mini/brand'), get('/mini/content')])
   const brand = brandResult.status === 'fulfilled' ? brandResult.value || {} : {}
-  const brandRules = ruleSections(brand.rules || brand.rulesJson)
   const items = contentResult.status === 'fulfilled' && Array.isArray(contentResult.value) ? contentResult.value : []
   const item = items.find(value => value.key === `rules.${type.value}`)
-  remoteContent.value = brandRules.length ? brandRules : ruleSections(item?.content)
+  const parsed = normalizeRuleContent(item ? item.content : ['service', 'privacy'].includes(type.value) ? null : brand.rules || brand.rulesJson, type.value)
+  remoteContent.value = parsed.sections
+  remoteTable.value = parsed.table
   if (!remoteContent.value.length && (brandResult.status === 'rejected' || contentResult.status === 'rejected')) {
     loadError.value = '规则暂时无法加载'
   }
@@ -79,12 +75,13 @@ const coupon = computed(() => getCouponTemplate(id.value))
 const title = computed(
   () =>
     ({
-      coupon: '使用规则',
+      service: '用户服务协议', privacy: '隐私保护指引', coupon: '使用规则',
       points: '积分规则',
       draw: '活动规则',
       promotion: '推广规则',
       ranking: '排行规则',
       shipping: '配送说明',
+      announcement: '商城商品与活动说明',
       campaign: '活动规则',
     })[type.value] || '规则说明',
 )
@@ -102,9 +99,9 @@ const rules = {
   ],
   draw: [
     {
-      heading: '扫码有礼',
+      heading: '雄酒专属 · 开瓶见礼',
       lines: [
-        '通过瓶身活动码参与对应活动。每个活动码的参与次数和有效期以活动配置为准。',
+        '开瓶见礼仅限雄酒，其他商品不参与。扫描雄酒的有效活动码参与，每码限参与一次，有效期以活动规则为准。',
         '奖励包含现金红包、积分、优惠券和实物商品。现金通过官方收款流程领取，实物凭个人兑奖资格到店兑换。',
         '活动资格、奖池、概率、金额和中奖结果均由服务端确定。',
       ],
@@ -161,4 +158,10 @@ const content = computed(() => {
 .rules-status { margin: 18px 20px; padding: 18px 0; color: #68766e; font-size: 14px; }
 .rules-status.notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }
 .rules-status .text-button { flex: 0 0 auto; }
+.rules-page-table { margin-top: 24px; border: 1px solid #e3ddd7; }
+.rules-page-row { display: flex; border-top: 1px solid #e3ddd7; }
+.rules-page-row:first-child { border-top: 0; }
+.rules-page-head { background: #f1efeb; font-weight: 600; }
+.rules-page-row > text { flex: 1; min-width: 0; margin: 0; padding: 10px 6px; border-right: 1px solid #e3ddd7; font-size: 12px; line-height: 1.7; text-align: center; }
+.rules-page-row > text:last-child { border-right: 0; }
 </style>

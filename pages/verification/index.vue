@@ -350,7 +350,7 @@ async function verify() {
 .permission-primary { color: #fff; background: #245a4a; }
 .permission-primary::after { border: 0; }
 .badge-red { color: #9d4944; background: #f8e6e3; }
-.verification-loading { min-height: 520px; padding: 24px 18px; background: #fafaf7; }
+.verification-loading { min-height: 520px; padding: 24px 18px; background: #faf9f6; }
 .verification-loading-header, .verification-loading-toolbar, .verification-loading-card { background: linear-gradient(100deg, #eeeae1 20%, #f8f5ee 38%, #eeeae1 56%); background-size: 300% 100%; animation: verification-skeleton-shimmer 1.4s ease-in-out infinite; }
 .verification-loading-header { width: 72%; height: 74px; border-radius: 8px; }
 .verification-loading-toolbar { height: 50px; margin-top: 18px; border-radius: 8px; }

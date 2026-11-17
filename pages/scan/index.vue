@@ -1,21 +1,16 @@
 <template>
-  <PageShell title="扫码有礼" dark left :back-button="false" active="scan">
-    <view class="scan-hero">
-      <image :src="assetUrl('/static/design/detail-scene-clean.jpg', 'brand.scan')" mode="aspectFill" />
-      <view class="scan-hero-copy">
-        <view class="hero-title">
-          <text class="block">开启</text>
-          <text class="block">一份</text>
-          <text class="block">好礼</text>
-        </view>
-      </view>
-      <view class="scanner-frame" />
-    </view>
+  <PageShell title="开瓶见礼" dark left :back-button="false" active="scan">
+    <view class="scan-intro"><text class="scan-heading">雄酒专属 · 开瓶见礼</text><text class="small">本活动仅限雄酒，其他商品不参与</text></view>
     <view class="scan-content">
-      <button class="btn" aria-label="扫描瓶身活动码参与抽奖" @click="scan">
-        <AppIcon name="scan" tone="light" :size="30" />
+      <view class="scan-card">
+      <view class="scan-symbol"><AppIcon name="scan" tone="brand" :size="94" /></view>
+      <text class="strong block center">扫描雄酒的有效活动码</text>
+      <text class="muted small block center">每个有效活动码限参与一次</text>
+      <button class="btn" aria-label="扫描雄酒活动码参与抽奖" @click="scan">
+        <AppIcon name="scan" tone="light" :size="22" />
         扫一扫
       </button>
+      </view>
       <view class="section-heading">
         <text class="section-title serif">{{ isApiMode() ? '活动奖项' : '演示奖项' }}</text>
         <text class="small muted">{{ isApiMode() ? '以当前活动规则为准' : '仅供界面预览' }}</text>
@@ -58,7 +53,7 @@
         </view>
       </view>
       <view class="scan-links">
-        <button class="text-button" @click="go('rules', { type: 'draw' })">
+        <button class="text-button" @click="rulesOpen = true">
           活动规则
           <AppIcon name="arrow" :size="17" />
         </button>
@@ -68,9 +63,11 @@
         </button>
       </view>
     </view>
+    <ActivityRules v-model="rulesOpen" type="draw" :activities="drawActivities" @agree="agreeRules" @cancel="cancelRules" />
   </PageShell>
 </template>
 <script setup>
+import ActivityRules from '../../components/ActivityRules.vue'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
@@ -79,6 +76,10 @@ import { config, isApiMode, assetUrl } from '../../services/config.js'
 import { lotteryCodeFromInput } from '../../services/lottery-link.js'
 import { go, toast, confirm } from '../../services/navigation.js'
 import { ref } from 'vue'
+const rulesOpen = ref(false), rulesAccepted = ref(false)
+let pendingCode = '', pendingScan = false
+function cancelRules() { pendingCode = ''; pendingScan = false }
+function agreeRules() { rulesAccepted.value = true; if (pendingCode) { const code = pendingCode; pendingCode = ''; handleCode(code) } else if (pendingScan) { pendingScan = false; scan() } }
 const drawActivities = ref([])
 const drawLoading = ref(false)
 const drawError = ref('')
@@ -101,7 +102,7 @@ function prizeValue(prize) {
     return min === max ? `红包 ¥${min}` : `红包 ¥${min}–¥${max}`
   }
   if (prize.kind === 'points') return `${Number(prize.points || 0)} 积分`
-  return prize.kind === 'ticket' ? '门票权益' : prize.kind === 'coupon' ? '优惠权益' : '实物礼品'
+  return prize.kind === 'ticket' ? '门票权益' : prize.kind === 'voucher' ? '电子券权益' : prize.kind === 'coupon' ? '优惠权益' : '实物礼品'
 }
 function activityPeriod(activity) {
   const format = (value) => {
@@ -147,6 +148,7 @@ async function demo() {
   })
 }
 async function handleCode(code) {
+  if (!rulesAccepted.value) { pendingCode = code; rulesOpen.value = true; return }
   if (!isApiMode()) {
     const reward = previewDraw(code)
     if (code === 'cash') go('redpacket', { id: reward.rewardId })
@@ -156,13 +158,14 @@ async function handleCode(code) {
   try {
     const reward = await drawCode(code)
     if (reward?.kind === 'cash') go('redpacket', { id: reward.id })
-    else if (['goods', 'ticket'].includes(reward?.kind)) go('awards')
+    else if (['goods', 'ticket', 'voucher'].includes(reward?.kind)) go('awards')
     else if (reward?.kind === 'coupon') go('my-coupons')
     else if (reward?.kind === 'points') go('points')
     else toast(reward?.message || '活动码已提交，结果以服务端为准')
   } catch (error) { toast(error.message) }
 }
 function scan() {
+  if (!rulesAccepted.value) { pendingCode = ''; pendingScan = true; rulesOpen.value = true; return }
   // #ifdef H5
   if (isApiMode()) return toast('请在微信小程序中使用扫码活动')
   demo()

@@ -11,11 +11,11 @@
         <view class="packet-intro">
           <text class="packet-eyebrow">JINSE WINE · REWARD</text>
           <text class="packet-title">{{ received ? (isApiMode() ? '发放状态已记录' : '领取流程预览完成') : '恭喜获得现金红包' }}</text>
-          <text class="packet-subtitle">{{ received ? (isApiMode() ? '业务服务端记录为已发放，到账请核对微信账单' : '演示状态已更新，未发生真实转账') : '一份来自金色酒业的活动礼遇' }}</text>
+          <text class="packet-subtitle">{{ received ? (isApiMode() ? '业务服务端记录为已发放，到账请核对微信账单' : '演示状态已更新，未发生真实转账') : '一份来自雄森酒业的活动礼遇' }}</text>
         </view>
         <view class="packet-card">
           <view class="packet-card-top">
-            <text class="packet-brand">金色酒业 · 活动奖励</text>
+            <text class="packet-brand">雄森酒业 · 活动奖励</text>
             <AppIcon name="gift" tone="light" :size="22" />
           </view>
           <view class="packet-money">

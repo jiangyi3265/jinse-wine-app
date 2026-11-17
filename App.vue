@@ -22,4 +22,5 @@ export default {
   },
 }
 </script>
-<style>@import './styles/app.css';</style>
+<style>@import './styles/app.css';
+@import './styles/design-system.css';</style>

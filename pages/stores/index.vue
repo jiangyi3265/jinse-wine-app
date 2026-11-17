@@ -40,13 +40,21 @@
       <!-- #endif -->
       <view v-else class="map-empty">
         <AppIcon name="location" tone="gold" :size="28" />
-        <text class="map-empty-title">{{ loadError ? '门店资料暂不可用' : '门店地图暂不可用' }}</text>
-        <text class="map-empty-copy">{{ loadError || '门店位置正在完善，您可以先查看地址或致电门店' }}</text>
+        <text class="map-empty-title">{{ loadError ? '门店资料暂不可用' : '查找门店 · 轻松到店' }}</text>
+        <text v-if="loadError" class="map-empty-copy">{{ loadError }}</text>
+        <text v-else class="map-empty-copy">
+          <!-- #ifdef MP-WEIXIN -->
+          点击“地图查找”会复制门店地址，进入地图后粘贴搜索。
+          <!-- #endif -->
+          <!-- #ifndef MP-WEIXIN -->
+          在下方选择门店，点击“地图查找”按地址搜索。
+          <!-- #endif -->
+        </text>
       </view>
       <button v-if="!loading && mapCenter && mapStores.length" class="map-locate" :disabled="locating" aria-label="定位当前" @click="retryLocation">
         <AppIcon name="location" :size="26" />
       </button>
-      <text v-if="!loading && mapStores.length" class="map-caption">{{ currentLocation ? '按直线距离由近到远排列' : `已收录 ${mapStores.length} 家可导航门店` }}</text>
+      <text v-if="!loading && mapStores.length" class="map-caption">{{ currentLocation ? '已定位门店按直线距离排列' : `已标注 ${mapStores.length} 家门店位置` }}</text>
     </view>
     <view class="section">
       <view class="section-heading">
@@ -57,7 +65,7 @@
         </button>
       </view>
       <view v-if="filtersOpen" class="store-region-filter"><RegionSelect v-model="regionPath" clearable /></view>
-      <view class="store-location-status" :class="{ 'has-location': currentLocation }">
+      <view v-if="mapStores.length" class="store-location-status" :class="{ 'has-location': currentLocation }">
         <view class="column grow">
           <text>{{ locating ? '正在获取当前位置…' : currentLocation ? '已按距离由近到远排列' : '开启定位，查看附近兑换网点' }}</text>
           <text class="small muted">{{ locationError || (currentLocation ? '距离为直线估算，实际路程以导航为准' : '未定位时按默认顺序显示') }}</text>
@@ -82,7 +90,7 @@
             <text class="muted small">联系电话：{{ store.phone || '暂未配置' }}</text>
             <view class="row">
               <text class="badge" :class="storeReady(store) ? 'badge-green' : 'badge-muted'">
-                {{ storeReady(store) ? '营业中' : '资料待完善' }}
+                {{ storeReady(store) ? '实体门店' : '资料待完善' }}
               </text>
               <text class="muted small">{{ store.hours }}</text>
             </view>
@@ -94,9 +102,9 @@
             <AppIcon name="phone" :size="21" />
             拨打电话
           </button>
-          <button class="btn btn-outline" :class="{ 'is-unavailable': !hasStoreCoordinates(store) }" :disabled="!hasStoreCoordinates(store)" @click="locateStore(store)">
+          <button class="btn btn-outline" :class="{ 'is-unavailable': !canLocateStore(store) }" :disabled="!canLocateStore(store)" @click="locateStore(store)">
             <AppIcon name="navigation" :size="21" />
-            导航到店
+            {{ hasVerifiedStoreCoordinates(store) ? '导航到店' : '地图查找' }}
           </button>
           <button class="btn btn-outline" @click="go('store-detail', { id: store.id })">
             <AppIcon :name="store.serviceQr ? 'qr' : 'chevron'" :size="22" />
@@ -124,7 +132,7 @@ import RegionSelect from '../../components/RegionSelect.vue'
 import { resolveRegion } from '../../services/regions.js'
 import { distanceMetres, formatDistance, browserLocationToGcj02 } from '../../services/store-distance.js'
 import { stores, loadStoreCatalog } from '../../services/catalog.js'
-import { go, toast, callStore, locateStore, hasStoreCoordinates } from '../../services/navigation.js'
+import { go, toast, callStore, locateStore, hasStoreCoordinates, hasVerifiedStoreCoordinates, canLocateStore } from '../../services/navigation.js'
 const keyword = ref(''),
   regionPath = ref([]),
   filtersOpen = ref(false),
@@ -146,8 +154,9 @@ async function loadStores() {
     loadError.value = error.message || '门店资料暂时无法获取，请稍后重试'
   } finally { loading.value = false }
 }
-onShow(() => {
-  loadStores()
+onShow(async () => {
+  await loadStores()
+  if (!stores.some(hasVerifiedStoreCoordinates)) return
   if (!locationAttempted || (currentLocation.value && Date.now() - locatedAt > 60000)) locate()
 })
 const filtered = computed(() => {
@@ -160,7 +169,7 @@ const filtered = computed(() => {
   if (currentLocation.value) rows.sort((a, b) => (a.distanceMetres ?? Infinity) - (b.distanceMetres ?? Infinity))
   return rows
 })
-const mapStores = computed(() => filtered.value.filter(hasStoreCoordinates))
+const mapStores = computed(() => filtered.value.filter(hasVerifiedStoreCoordinates))
 const mapMarkers = computed(() => mapStores.value.map((store, index) => ({
   id: index + 1,
   latitude: Number(store.latitude),
@@ -246,6 +255,7 @@ function retryLocation() {
   // #endif
 }
 function distanceLabel(store) {
+  if (!hasVerifiedStoreCoordinates(store)) return '地址可查'
   if (!currentLocation.value) return locating.value ? '定位中' : '待定位'
   return formatDistance(store.distanceMetres)
 }
@@ -254,7 +264,7 @@ function openMapStore(event) {
   if (store) locateStore(store)
 }
 function pinStyle(index) {
-  const positions = [[28, 34], [68, 58], [48, 25], [78, 28]]
+  const positions = [[25, 27], [72, 28], [28, 66], [73, 66]]
   const [left, top] = positions[index % positions.length]
   return { left: `${left}%`, top: `${top}%` }
 }
@@ -269,18 +279,26 @@ function storeAddress(store) {
 function missingServiceInfo(store) {
   const missing = []
   if (!store.phone) missing.push('联系电话')
-  if (!hasStoreCoordinates(store)) missing.push('导航坐标')
+  if (!canLocateStore(store)) missing.push('门店位置')
   return missing.length ? `${missing.join('、')}暂未配置` : ''
 }
 function storeReady(store) {
   return store.status === undefined || String(store.status) === '0'
     ? Boolean(storeAddress(store) !== '门店地址待完善'
       && store.phone
-      && hasStoreCoordinates(store))
+      && canLocateStore(store))
     : false
 }
 </script>
 <style scoped>
+.store-item > .row { align-items: flex-start; }
+.store-item .grow { min-width: 0; }
+.store-item .between { align-items: flex-start; gap: 8px; }
+.store-item .store-name { font-size: 17px; line-height: 1.5; flex: 1; }
+.store-distance { flex-shrink: 0; font-size: 10px; }
+.store-item .store-photo { width: 92px; height: 110px; flex: 0 0 92px; }
+.store-item .store-actions { gap: 8px; }
+.store-item .store-actions .btn { font-size: 12px; padding-left: 6px; padding-right: 6px; }
 .region-filter-toggle { display: flex; align-items: center; gap: 5px; max-width: 65%; min-width: 0; padding: 6px 0 6px 8px; color: #365746; font-size: 13px; }
 .region-filter-toggle text { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .region-filter-toggle::after { border: none; }

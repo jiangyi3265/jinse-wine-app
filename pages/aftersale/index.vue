@@ -19,7 +19,8 @@
           </view>
           <view class="field"><text class="field-label"><text class="required">*</text> 数量（最多 {{ availableQuantity }} 件）</text><input v-model="form.quantity" type="number" class="field-input" placeholder="请输入售后数量" /></view>
           <view class="field"><text class="field-label"><text class="required">*</text> 售后原因</text><textarea v-model="form.reason" class="reason-input" maxlength="200" placeholder="请填写售后原因" /><text class="muted small">{{ form.reason.length }}/200</text></view>
-          <button class="btn" :disabled="busy || availableQuantity < 1" @click="apply">{{ busy ? '正在提交' : '提交申请' }}</button>
+          <view class="field"><text class="field-label">上传凭证 <text class="muted small">（选填，最多3张）</text></text><view class="evidence-grid"><view v-for="(src, index) in images" :key="src" class="evidence-tile"><image :src="mediaUrl(src)" mode="aspectFill" @click="preview(src)" /><button aria-label="移除图片" :disabled="busy || uploading" @click="images.splice(index, 1)">×</button></view><button v-if="images.length < 3" class="evidence-add" :disabled="uploading || busy" @click="chooseImages">{{ uploading ? '上传中…' : '＋ 添加图片' }}</button></view><text class="muted small">JPG / PNG，每张不超过5MB</text></view>
+          <button class="btn" :disabled="busy || uploading || availableQuantity < 1" @click="apply">{{ busy ? '正在提交' : '提交申请' }}</button>
         </view>
         <text v-else-if="!recordsOnly" class="muted">{{ order?.status === 'paid' ? '商品尚未发货，可在订单详情申请退款。' : '当前订单暂不可申请新的退货换货。' }}</text>
         <view v-if="recordsOnly || records.length" class="records-section">
@@ -43,6 +44,7 @@
           <text class="muted small block">{{ detail.aftersaleNo }}</text>
           <text class="status block">{{ statusLabel(detail.status) }}</text>
           <text class="block">申请原因：{{ detail.reason }}</text>
+          <view v-if="detail.images?.length" class="evidence-grid"><image v-for="src in detail.images" :key="src" :src="mediaUrl(src)" class="evidence-tile" mode="aspectFill" @click="preview(src, detail.images)" /></view>
           <text v-if="detail.reviewNote" class="block">审核说明：{{ detail.reviewNote }}</text>
           <view v-if="detail.returnAddress" class="detail-row"><text class="field-label">退货收件信息</text><text class="block selectable">{{ detail.returnAddress }}</text><button class="text-button" @click="copy(detail.returnAddress)">复制地址</button></view>
           <view v-if="detail.returnTrackingNo" class="detail-row"><text class="field-label">寄回物流</text><text class="block selectable">{{ detail.returnCompany }} {{ detail.returnTrackingNo }}</text></view>
@@ -67,9 +69,9 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import PageShell from '../../components/PageShell.vue'
 import AppIcon from '../../components/AppIcon.vue'
-import { request } from '../../services/api.js'
+import { request, upload } from '../../services/api.js'
 import { refreshOrder } from '../../services/store.js'
-import { isApiMode } from '../../services/config.js'
+import { isApiMode, mediaUrl } from '../../services/config.js'
 import { confirm, dateLabel, toast } from '../../services/navigation.js'
 import { money } from '../../services/pricing.js'
 
@@ -78,6 +80,7 @@ const records = ref([]), recordsOnly = ref(false), detail = ref(null), itemIndex
 const pageNum = ref(1), pageSize = 20, total = ref(0), reservedQuantities = ref(null)
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const form = reactive({ type: 'return_refund', quantity: '1', reason: '' })
+const images = ref([]), uploading = ref(false)
 const shipment = reactive({ company: '', trackingNo: '' })
 let loadTask, submitKey = '', submitSignature = '', detailSequence = 0
 const items = computed(() => order.value?.items || [])
@@ -128,19 +131,34 @@ async function showDetail(caseId) {
     shipment.company = detail.value.returnCompany || ''; shipment.trackingNo = detail.value.returnTrackingNo || ''
   } catch (e) { if (sequence === detailSequence) toast(e.message || '售后详情加载失败') }
 }
+function preview(src, list = images.value) { uni.previewImage({ current: mediaUrl(src), urls: list.map(mediaUrl) }) }
+async function chooseImages() {
+  if (uploading.value || busy.value) return
+  uploading.value = true
+  try {
+    const picked = await uni.chooseImage({ count: 3 - images.value.length, sizeType: ['compressed'], sourceType: ['album', 'camera'] })
+    for (const file of picked.tempFiles || []) {
+      if (Number(file.size) > 5 * 1024 * 1024) { toast('图片不能超过5MB'); continue }
+      const result = await upload('/mini/aftersales/images', file.path)
+      if (!result?.url) throw new Error('上传未成功，请重试')
+      images.value.push(result.url)
+    }
+  } catch (error) { if (!String(error.errMsg || '').includes('cancel')) toast(error.message || '图片上传失败，请重试') }
+  finally { uploading.value = false }
+}
 async function apply() {
-  if (busy.value || loading.value || loadError.value || !eligible.value) return
+  if (busy.value || uploading.value || loading.value || loadError.value || !eligible.value) return
   const item = items.value[itemIndex.value], quantity = Number(form.quantity), reason = form.reason.trim()
   if (!item?.orderItemId) return toast('请选择售后商品')
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > availableQuantity.value) return toast('请输入有效的售后数量')
   if (!reason) return toast('请填写售后原因')
-  const data = { type: form.type, orderItemId: item.orderItemId, quantity, reason }
+  const data = { type: form.type, orderItemId: item.orderItemId, quantity, reason, images: [...images.value] }
   const signature = JSON.stringify(data)
   if (signature !== submitSignature) { submitKey = `after_${Date.now()}_${Math.random().toString(36).slice(2)}`; submitSignature = signature }
   busy.value = true
   try {
     detail.value = await request(`/mini/orders/${encodeURIComponent(id.value)}/aftersales`, { method: 'POST', auth: true, requestId: submitKey, data })
-    toast('售后申请已提交'); recordsOnly.value = true; form.reason = ''; submitSignature = ''; submitKey = ''; await load(1)
+    toast('售后申请已提交'); recordsOnly.value = true; form.reason = ''; images.value = []; submitSignature = ''; submitKey = ''; await load(1)
   } catch (e) { toast(e.message || '售后申请提交失败') }
   finally { busy.value = false }
 }
@@ -172,7 +190,7 @@ function copy(value) { uni.setClipboardData({ data: value }) }
 .aftersale-page { padding-bottom: 36px; }
 .aftersale-tabs, .type-options { display: flex; gap: 0; border-bottom: 1px solid #dedfdc; margin-bottom: 20px; }
 .aftersale-tabs button, .type-options button { flex: 1; padding: 12px 4px; border-radius: 0; font-size: 15px; background: transparent; color: #666; border-bottom: 2px solid transparent; }
-.aftersale-tabs .selected, .type-options .selected { color: #194f40; border-bottom-color: #194f40; font-weight: 600; }
+.aftersale-tabs .selected, .type-options .selected { color: #782d3b; border-bottom-color: #782d3b; font-weight: 600; }
 .type-options { margin-top: 12px; }
 .field { margin-bottom: 20px; }
 .field-label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
@@ -193,4 +211,5 @@ function copy(value) { uni.setClipboardData({ data: value }) }
 .event-row { padding: 12px 0; border-bottom: 1px solid #e5e8e3; font-size: 13px; }
 .aftersale-error { color: #a63838; display: grid; gap: 12px; }
 .selectable { user-select: text; overflow-wrap: anywhere; }
+.evidence-grid { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }.evidence-tile, .evidence-add { position: relative; width: 84px; height: 84px; border-radius: 8px; overflow: hidden; }.evidence-tile image { width: 100%; height: 100%; }.evidence-tile button { position: absolute; top: 0; right: 0; width: 28px; height: 28px; padding: 0; line-height: 28px; background: #782d3b; color: #faf9f6; }.evidence-add { margin: 0; padding: 0; background: #f1efeb; border: 1px dashed #cbbdb8; color: #782d3b; font-size: 12px; display: flex; align-items: center; justify-content: center; }
 </style>
