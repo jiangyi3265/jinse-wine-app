@@ -19,6 +19,9 @@ test('shop distinguishes a catalog failure from an empty result and recovers on 
       },
     },
     '../../services/navigation.js': { go() {} },
+    '../../services/api.js': { hasSession: () => false },
+    '../../services/config.js': { isApiMode: () => true },
+    '../../services/store.js': { fetchCart: () => assert.fail('游客浏览商城时无需读取购物车') },
   })
 
   await onShowHandler()
@@ -30,4 +33,24 @@ test('shop distinguishes a catalog failure from an empty result and recovers on 
   assert.equal(page.loadError.value, '')
   assert.equal(page.filtered.value.length, 1)
   assert.equal(page.filtered.value[0].name, '典藏酱香')
+})
+
+test('shop cart badge sums quantities and ignores an older read after adding an item', async () => {
+  const reads = []
+  const page = loadPageScript('shop', {
+    vue,
+    '@dcloudio/uni-app': { onShow() {} },
+    '../../services/catalog.js': { products: [], loadProductCatalog: async () => {} },
+    '../../services/navigation.js': { go() {} },
+    '../../services/api.js': { hasSession: () => true },
+    '../../services/config.js': { isApiMode: () => true },
+    '../../services/store.js': { fetchCart: () => new Promise(resolve => reads.push(resolve)) },
+  })
+  const earlier = page.refreshCartQuantity()
+  const latest = page.refreshCartQuantity()
+  reads[1]([{ quantity: 2 }, { quantity: 3 }])
+  await latest
+  reads[0]([])
+  await earlier
+  assert.equal(page.cartQuantity.value, 5)
 })

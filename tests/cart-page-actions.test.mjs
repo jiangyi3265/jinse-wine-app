@@ -16,8 +16,73 @@ function harness() {
   });return{page,cart,calls,setUpdate:fn=>{update=fn},setRead:fn=>{read=fn}}
 }
 test('selection and all-select calculate only chosen items and navigate without creating an order',async()=>{const h=harness();await h.page.refresh();assert.equal(h.page.total.value,5000);h.page.toggle(2);assert.equal(h.page.total.value,1000);h.page.checkout();assert.deepEqual(h.calls,[['prepare',['1']],['go','checkout']]);h.page.toggleAll();assert.equal(h.page.totalQuantity.value,3);h.page.toggleAll();assert.equal(h.page.total.value,0);h.page.checkout();assert.equal(h.calls.at(-1)[0],'toast')})
-test('unselected unavailable item cannot block available selected products',async()=>{const h=harness();h.cart[1].stock=0;await h.page.refresh();assert.deepEqual([...h.page.selectedIds.value],['1']);h.page.checkout();assert.equal(h.calls.at(-1)[1],'checkout');h.page.toggle(2);h.page.checkout();assert.equal(h.calls.at(-1)[0],'toast')})
-test('quantity adjustment retains selection and removal preserves unchecked items',async()=>{const h=harness();await h.page.refresh();h.page.toggle(2);await h.page.change(h.cart[0],1);assert.equal(h.page.total.value,2000);await h.page.removeSelected();assert.deepEqual(h.cart.map(x=>x.id),[2]);assert.equal(h.page.total.value,0)})
+test('checkout selects available lines only, including after a stock change', async () => {
+  const h = harness()
+  await h.page.refresh()
+  h.cart[1].stock = 0
+  await h.page.refresh()
+  assert.deepEqual([...h.page.selectedIds.value], ['1'])
+  assert.equal(h.page.allSelected.value, true)
+  h.page.toggleAll()
+  h.page.toggleAll()
+  h.page.toggle(2)
+  assert.deepEqual([...h.page.selectedIds.value], ['1'])
+  h.page.checkout()
+  assert.deepEqual(h.calls, [['prepare', ['1']], ['go', 'checkout']])
+})
+test('deletion starts unselected, allows sold-out items and retains the purchase selection', async () => {
+  const h = harness()
+  h.cart[1].stock = 0
+  await h.page.refresh()
+  await h.page.change(h.cart[0], 1)
+  assert.equal(h.page.total.value, 2000)
+  h.page.toggleManaging()
+  assert.equal(h.page.chosen.value.length, 0)
+  await h.page.removeSelected()
+  assert.equal(h.cart.length, 2)
+  h.page.toggle(2)
+  await h.page.removeSelected()
+  h.page.toggleManaging()
+  assert.deepEqual(h.cart.map(x => x.id), [1])
+  assert.equal(h.page.total.value, 2000)
+  h.page.toggleManaging()
+  h.page.toggleAll()
+  await h.page.removeSelected()
+  assert.equal(h.page.itemQuantity.value, 0)
+  assert.equal(h.page.managing.value, false)
+})
+
+test('quantity edits respect both stock and the API limit for a single update', async () => {
+  const h = harness()
+  Object.assign(h.cart[0], {quantity: 99, stock: 150})
+  let writes = 0
+  h.setUpdate(async (id, quantity) => { writes++; h.cart[0].quantity = quantity })
+  await h.page.refresh()
+  await h.page.change(h.cart[0], 1)
+  assert.equal(writes, 0)
+  Object.assign(h.cart[0], {quantity: 110, stock: 105})
+  await h.page.adjustToStock(h.cart[0])
+  assert.equal(h.cart[0].quantity, 99)
+  h.cart[0].stock = 4
+  await h.page.adjustToStock(h.cart[0])
+  assert.equal(h.cart[0].quantity, 4)
+  h.cart[0].stock = 0
+  await h.page.change(h.cart[0], -1)
+  assert.equal(writes, 2)
+})
+
+test('late cart reads cannot hide the newer list or restore stale quantities', async () => {
+  const h = harness()
+  let reject
+  h.setRead(() => new Promise((_, fail) => { reject = fail }))
+  const stale = h.page.refresh()
+  h.setRead(async () => [{...h.cart[0], quantity: 3}])
+  await h.page.refresh()
+  reject(Error('旧请求超时'))
+  await stale
+  assert.equal(h.page.loadError.value, '')
+  assert.equal(h.page.itemQuantity.value, 3)
+})
 
 test('minus at quantity one never silently deletes a cart item', async()=>{
   const h=harness();await h.page.refresh();await h.page.change(h.page.items.value[0],-1)

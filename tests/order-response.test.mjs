@@ -17,6 +17,8 @@ globalThis.uni = {
   requestPayment: async () => { paymentUiCalls += 1; if (paymentUiError) throw paymentUiError },
   request: async ({ url, method, data }) => {
     requests.push({ url, method, data })
+    if (method === 'POST' && ['/mini/orders/quote', '/mini/orders/cart/quote'].includes(url))
+      return { statusCode: 200, data: { code: 0, data: { total: 1000 } } }
     if (method === 'POST' && url === '/mini/orders/pay-order/pay')
       return { statusCode: 200, data: { code: 0, data: { timeStamp: '1', nonceStr: 'nonce', package: 'prepay_id=123', paySign: 'sign' } } }
     if (method === 'GET' && url === '/mini/orders/pay-order')
@@ -47,7 +49,7 @@ globalThis.uni = {
 
 const { config } = await import('../services/config.js')
 config.mode = 'api'
-const { state, submitOrder, submitCartOrder, setOrderStatus, receiveRedPacket, verifyAward, saveAddress,
+const { state, quoteCheckout, submitOrder, submitCartOrder, setOrderStatus, receiveRedPacket, verifyAward, saveAddress,
   requestRefund, withdrawCommission, payOrder, refreshOrder, syncPaymentOrder } = await import('../services/store.js')
 
 test('single-item order remains confirmed when coupon refresh fails', async () => {
@@ -84,6 +86,28 @@ test('cancelled order and released coupon remain visible when refresh fails', as
   assert.equal(state.orders.find(item => item.id === order.id)?.status, 'cancelled')
   assert.equal(state.coupons[0].status, 'unused')
   assert.equal(state.coupons[0].orderId, null)
+})
+
+test('postal and pickup send only the selected fulfillment target in quotes and orders from either entry point', async () => {
+  for (const source of ['product', 'cart']) {
+    const endpoint = source === 'cart' ? '/mini/orders/cart' : '/mini/orders'
+    for (const mode of ['pickup', 'delivery']) {
+      state.checkout = { source, fulfillmentMode: mode, addressId: 'address-1', pickupStoreId: '15',
+        productId: 'classic', quantity: 1, cartItemIds: ['line-1'], requestId: 'order-request' }
+      state.cart = [{ id: 'line-1', productId: 'classic', quantity: 1 }]
+      const start = requests.length
+      await quoteCheckout()
+      await submitOrder()
+      const calls = requests.slice(start).filter(call => call.url === endpoint || call.url === endpoint + '/quote')
+      assert.equal(calls.length, 2)
+      for (const { data } of calls) {
+        assert.equal(data.fulfillmentMode, mode)
+        assert.equal(data[mode === 'pickup' ? 'pickupStoreId' : 'addressId'], mode === 'pickup' ? '15' : 'address-1')
+        assert.equal(mode === 'pickup' ? 'addressId' in data : 'pickupStoreId' in data, false)
+        assert.equal('shippingStoreId' in data, false)
+      }
+    }
+  }
 })
 
 test('cash confirmation parameters survive an unavailable status refresh', async () => {

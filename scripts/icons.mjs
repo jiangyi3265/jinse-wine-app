@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import { mkdir } from 'node:fs/promises'
 const paths = {
+ cart:'<path d="M2 3h3l2.3 11h11.8l2.1-8H5.6M7.3 14l.6 3h11"/><circle cx="9" cy="20.5" r="1"/><circle cx="18" cy="20.5" r="1"/>',
  home:'<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',bag:'<path d="M5 5h14l1 16H4L5 5Z"/><path d="M8 8a4 4 0 0 0 8 0"/>',
  scan:'<path d="M3 9V5a2 2 0 0 1 2-2h4m6 0h4a2 2 0 0 1 2 2v4m0 6v4a2 2 0 0 1-2 2h-4m-6 0H5a2 2 0 0 1-2-2v-4M3 12h18"/>',
  share:'<circle cx="18" cy="5" r="3"/><circle cx="5" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8 10 7-4M8 14l7 4"/>',

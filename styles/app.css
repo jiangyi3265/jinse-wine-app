@@ -2732,15 +2732,6 @@ uni-modal .uni-modal {
 .page-shell .price-current {
   color: #8d3f39;
 }
-.page-shell .shop-cart {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-left: 1px solid #dfe2dc;
-}
 .page-shell .shop-category-tabs {
   display: block;
   height: 53px;

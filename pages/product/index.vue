@@ -84,7 +84,7 @@
           <AppIcon name="headset" :size="25" />
           <text class="small muted">客服</text>
         </button>
-        <button class="purchase-shortcut" aria-label="购物车" @click="go('cart')"><AppIcon name="bag" :size="23" /><text class="small muted">购物车</text></button>
+        <button class="purchase-shortcut" aria-label="购物车" @click="go('cart')"><AppIcon name="cart" :size="23" /><text class="small muted">购物车</text></button>
         <button class="btn btn-outline" :disabled="adding || (!needsSku && currentStock <= 0)" :aria-busy="adding" @click="addToCart">{{ adding ? '加入中…' : '加入购物车' }}</button>
         <button class="btn" :disabled="adding || (!needsSku && currentStock <= 0)" @click="buy">{{ needsSku ? '选择规格' : currentStock <= 0 ? '暂时缺货' : '立即购买' }}</button>
       </view>

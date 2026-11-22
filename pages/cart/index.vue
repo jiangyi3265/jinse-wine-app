@@ -10,18 +10,63 @@
     </view>
     <EmptyState v-else-if="loadError" title="购物车暂时无法加载" :description="loadError" button="重新加载" @action="refresh" />
     <view v-else-if="items.length" class="cart-list">
-      <view class="fulfillment-switch"><button :class="['fulfillment-option', {active: checkoutMode === 'delivery'}]" @click="setMode('delivery')">平台配送</button><button :class="['fulfillment-option', {active: checkoutMode === 'pickup'}]" @click="setMode('pickup')">门店自提</button></view>
-      <button class="cart-address" @click="checkoutMode === 'pickup' ? chooseStore() : chooseAddress()"><view class="cart-address-main"><AppIcon :name="checkoutMode === 'pickup' ? 'shop' : 'pin'" :size="20" tone="brand"/><view class="column"><text>{{ checkoutMode === 'pickup' ? selectedStore?.name || '选择自提门店' : selectedAddress ? selectedAddress.name + ' · ' + selectedAddress.phone : '选择收货地址' }}</text><text class="muted small">{{ checkoutMode === 'pickup' ? storeError || selectedStore?.address : addressError || selectedAddress?.detail }}</text></view></view><AppIcon name="chevron" :size="14" /></button>
-      <view class="between"><text class="strong">精选好物 · {{ items.length }} 件商品</text><button class="text-button" :disabled="submitting" @click="managing = !managing">{{ managing ? '完成' : '管理' }}</button></view>
-      <view v-for="item in items" :key="item.id" class="cart-item">
-        <button class="cart-check" role="checkbox" :disabled="submitting" :aria-label="`选择${item.name}`" :aria-checked="selectedIds.includes(String(item.id))" @click="toggle(item.id)"><text :class="['selection-dot', { checked: selectedIds.includes(String(item.id)) }]">{{ selectedIds.includes(String(item.id)) ? '✓' : '' }}</text></button>
-        <image :src="productImage(item.image)" mode="aspectFill" class="cart-image" />
-        <view class="cart-main"><text class="cart-name">{{ item.name }}</text><text class="muted">{{ item.spec }}</text><text v-if="itemIssue(item)" class="cart-item-alert">{{ itemIssue(item) }}</text><button v-if="canAdjustToStock(item)" class="cart-adjust" :disabled="submitting" @click="adjustToStock(item)">调整为 {{ item.stock }} 件</button><view class="cart-bottom"><PriceTag :value="item.price" /><view class="stepper"><button :disabled="submitting || Number(item.quantity) <= 1" aria-label="减少数量" @click="change(item, -1)">−</button><text>{{ item.quantity }}</text><button :disabled="submitting || (isApiMode() && Number(item.stock) <= Number(item.quantity))" aria-label="增加数量" @click="change(item, 1)">＋</button></view></view><text v-if="updatingId === String(item.id)" class="cart-update-status" role="status">正在更新数量…</text></view>
-        <button class="remove" :disabled="submitting" aria-label="删除商品" @click="remove(item)">删除</button>
+      <view class="cart-heading">
+        <view><text class="cart-heading-title">已加购商品</text><text class="cart-heading-count">共 {{ itemQuantity }} 件</text></view>
+        <button class="cart-manage" :disabled="submitting" @click="toggleManaging">{{ managing ? '完成' : '管理' }}</button>
       </view>
-      <view class="cart-footer"><button class="cart-check-all" role="checkbox" :disabled="submitting" :aria-checked="allSelected" @click="toggleAll"><text :class="['selection-dot', { checked: allSelected }]">{{ allSelected ? '✓' : '' }}</text>全选</button><view class="cart-total-copy"><text>商品合计</text><text class="total">¥{{ (total / 100).toFixed(2) }}</text></view><button class="btn" :disabled="!chosen.length || submitting" @click="managing ? removeSelected() : checkout()">{{ submitting ? '处理中…' : `${managing ? '删除' : '去结算'}（${totalQuantity}）` }}</button></view>
+      <view class="cart-products">
+        <view v-for="item in items" :key="item.id" class="cart-item">
+          <button class="cart-check" role="checkbox" :disabled="submitting || (!managing && !!itemIssue(item))" :aria-label="`选择${item.name}`" :aria-checked="selectedIds.includes(String(item.id))" @click="toggle(item.id)">
+            <text :class="['selection-dot', { checked: selectedIds.includes(String(item.id)) }]">{{ selectedIds.includes(String(item.id)) ? '✓' : '' }}</text>
+          </button>
+          <image :src="productImage(item.image)" mode="aspectFit" class="cart-image" />
+          <view class="cart-main">
+            <text class="cart-name">{{ item.name }}</text>
+            <text class="muted">{{ item.spec }}</text>
+            <text v-if="itemIssue(item)" class="cart-item-alert">{{ itemIssue(item) }}</text>
+            <button v-if="canAdjustToStock(item)" class="cart-adjust" :disabled="submitting" @click="adjustToStock(item)">调整为 {{ quantityLimit(item) }} 件</button>
+            <view class="cart-bottom">
+              <PriceTag v-if="item.price != null" :value="item.price" />
+              <text v-else class="muted">价格暂无</text>
+              <view class="stepper">
+                <button :disabled="submitting || Number(item.quantity) <= 1 || !quantityLimit(item)" aria-label="减少数量" @click="change(item, -1)">−</button>
+                <text>{{ item.quantity }}</text>
+                <button :disabled="submitting || Number(item.quantity) >= quantityLimit(item)" aria-label="增加数量" @click="change(item, 1)">＋</button>
+              </view>
+            </view>
+            <text v-if="updatingId === String(item.id)" class="cart-update-status" role="status">正在更新数量…</text>
+          </view>
+        </view>
+      </view>
+      <view class="cart-delivery">
+        <view class="fulfillment-switch">
+          <button :class="['fulfillment-option', {active: checkoutMode === 'delivery'}]" @click="setMode('delivery')">快递邮寄</button>
+          <button :class="['fulfillment-option', {active: checkoutMode === 'pickup'}]" @click="setMode('pickup')">门店自提</button>
+        </view>
+        <button class="cart-address" @click="checkoutMode === 'pickup' ? chooseStore() : chooseAddress()">
+          <view class="cart-address-main">
+            <AppIcon :name="checkoutMode === 'pickup' ? 'shop' : 'pin'" :size="20" tone="brand" />
+            <view class="column">
+              <text>{{ checkoutMode === 'pickup' ? selectedStore?.storeName || selectedStore?.name || '选择自提门店' : selectedAddress ? selectedAddress.name + ' · ' + selectedAddress.phone : '选择收货地址' }}</text>
+              <text class="muted small">{{ checkoutMode === 'pickup' ? storeError || selectedStore?.address : addressError || selectedAddress?.detail }}</text>
+            </view>
+          </view>
+          <AppIcon name="chevron" :size="14" />
+        </button>
+      </view>
+      <view class="cart-footer">
+        <button class="cart-check-all" role="checkbox" :disabled="submitting || !selectable.length" :aria-checked="allSelected" @click="toggleAll"><text :class="['selection-dot', { checked: allSelected }]">{{ allSelected ? '✓' : '' }}</text>全选</button>
+        <view v-if="managing" class="cart-total-copy">已选 {{ chosen.length }} 款商品</view>
+        <view v-else class="cart-total-copy"><text>商品合计</text><text class="total">¥{{ (total / 100).toFixed(2) }}</text></view>
+        <button class="btn" :disabled="!chosen.length || submitting" @click="managing ? removeSelected() : checkout()">{{ submitting ? '处理中…' : managing ? `删除（${chosen.length}）` : `去结算（${totalQuantity}）` }}</button>
+      </view>
     </view>
-    <EmptyState v-else title="购物车是空的" description="去商城挑选喜欢的酒品" button="去商城" @action="go('shop')" />
+    <view v-else class="cart-empty">
+      <view class="cart-empty-icon"><AppIcon name="cart" tone="brand" :size="44" /></view>
+      <text class="cart-heading-title">购物车还是空的</text>
+      <text class="cart-empty-tip">在商城点商品旁的「+」即可加入</text>
+      <button class="btn" @click="go('shop')">去逛商城</button>
+    </view>
   </PageShell>
 </template>
 <script setup>
@@ -37,13 +82,31 @@ import { productImage } from '../../services/product-media.js'
 import { state, loadCart, updateCartItem, removeCartItem, prepareCartCheckout, refreshDomain } from '../../services/store.js'
 import { stores, loadStoreCatalog } from '../../services/catalog.js'
 const items = ref([])
-const selectedIds = ref([]), initialized = ref(false), managing = ref(false)
+const itemQuantity = computed(() => items.value.reduce((sum, item) => sum + Number(item.quantity || 0), 0))
+const checkoutIds = ref([]), removalIds = ref([]), initialized = ref(false), managing = ref(false)
+const selectedIds = computed(() => managing.value ? removalIds.value : checkoutIds.value)
+const selectable = computed(() => managing.value ? items.value : items.value.filter(item => !itemIssue(item)))
 const chosen = computed(() => items.value.filter(item => selectedIds.value.includes(String(item.id))))
-const allSelected = computed(() => items.value.length > 0 && chosen.value.length === items.value.length)
-function toggle(id) { if (submitting.value) return; id = String(id); selectedIds.value = selectedIds.value.includes(id) ? selectedIds.value.filter(value => value !== id) : [...selectedIds.value, id] }
-function toggleAll() { if (submitting.value) return; selectedIds.value = allSelected.value ? [] : items.value.map(item => String(item.id)) }
+const allSelected = computed(() => selectable.value.length > 0 && chosen.value.length === selectable.value.length)
+function toggleManaging() {
+  if (submitting.value) return
+  removalIds.value = []
+  managing.value = !managing.value
+}
+function setSelection(ids) {
+  if (managing.value) removalIds.value = ids
+  else checkoutIds.value = ids
+}
+function toggle(id) {
+  if (submitting.value || !selectable.value.some(item => String(item.id) === String(id))) return
+  const key = String(id)
+  setSelection(selectedIds.value.includes(key) ? selectedIds.value.filter(value => value !== key) : [...selectedIds.value, key])
+}
+function toggleAll() {
+  if (!submitting.value) setSelection(allSelected.value ? [] : selectable.value.map(item => String(item.id)))
+}
 async function removeSelected() {
-  if (submitting.value || loading.value || !chosen.value.length) return
+  if (!managing.value || submitting.value || loading.value || !chosen.value.length) return
   const ids = chosen.value.map(item => item.id)
   submitting.value = true
   let changed = false
@@ -75,23 +138,34 @@ function itemIssue(item) {
   if (!Number.isFinite(stock)) return '库存状态待确认，请刷新购物车'
   if (stock <= 0) return '已售罄或已下架'
   if (stock < Number(item.quantity)) return `仅剩 ${stock} 件`
+  if (item.price == null) return '价格待确认'
   return ''
 }
-function canAdjustToStock(item) {
-  return isApiMode() && Number(item.stock) > 0 && Number(item.stock) < Number(item.quantity)
+function quantityLimit(item) {
+  return isApiMode() ? Math.min(99, Math.max(0, Number(item.stock) || 0)) : 99
 }
+function canAdjustToStock(item) {
+  return quantityLimit(item) > 0 && Number(item.quantity) > quantityLimit(item)
+}
+let refreshRevision = 0
 async function refresh(showLoading = true) {
+  const revision = ++refreshRevision
   if (showLoading) loading.value = true
   loadError.value = ''
   try {
-    items.value = await loadCart()
-    selectedIds.value = initialized.value ? selectedIds.value.filter(id => items.value.some(item => String(item.id) === id)) : items.value.filter(item => !itemIssue(item)).map(item => String(item.id))
-    initialized.value = true
-
+    const rows = await loadCart()
+    if (revision !== refreshRevision) return
+    items.value = rows
+    const eligible = rows.filter(item => !itemIssue(item)).map(item => String(item.id))
+    checkoutIds.value = initialized.value ? checkoutIds.value.filter(id => eligible.includes(id)) : eligible
+    removalIds.value = removalIds.value.filter(id => rows.some(item => String(item.id) === id))
+    initialized.value = rows.length > 0
+    if (!rows.length) managing.value = false
   } catch (error) {
+    if (revision !== refreshRevision) return
     items.value = []
     loadError.value = error.message || '购物车暂时无法获取，请稍后重试'
-  } finally { loading.value = false }
+  } finally { if (revision === refreshRevision) loading.value = false }
 }
 function chooseAddress() { go('addresses', { select: '1' }) }
 async function refreshAddresses() {
@@ -112,7 +186,6 @@ async function refreshStores() {
   try {
     await loadStoreCatalog()
     storeReady.value = true
-    if (!state.checkout.pickupStoreId && stores.length) state.checkout.pickupStoreId = String(stores[0].storeId ?? stores[0].id)
   } catch { storeError.value = '自提门店暂时无法加载' }
   finally { storeLoading.value = false }
 }
@@ -131,13 +204,13 @@ async function change(item, delta) {
   if (submitting.value || loading.value) return
   const next = Number(item.quantity) + delta
   if (next < 1) return
-  if (delta < 0 && canAdjustToStock(item) && next > Number(item.stock)) return adjustToStock(item)
-  if (isApiMode() && delta > 0 && next > Number(item.stock)) return
+  if (delta < 0 && canAdjustToStock(item)) return adjustToStock(item)
+  if (next > quantityLimit(item)) return
   await mutateCart(() => updateCartItem(item.id, next), item.id)
 }
 async function adjustToStock(item) {
   if (!canAdjustToStock(item)) return
-  await mutateCart(() => updateCartItem(item.id, Number(item.stock)), item.id)
+  await mutateCart(() => updateCartItem(item.id, quantityLimit(item)), item.id)
 }
 async function mutateCart(action, itemId = '') {
   if (submitting.value || loading.value) return
@@ -152,12 +225,8 @@ async function mutateCart(action, itemId = '') {
     submitting.value = false
   }
 }
-async function remove(item) {
-  if (submitting.value || loading.value) return
-  await mutateCart(async () => { if (await confirm('删除商品', `确认移除${item.name}？`)) await removeCartItem(item.id) })
-}
 function checkout() {
-  if (submitting.value || loading.value || loadError.value) return
+  if (managing.value || submitting.value || loading.value || loadError.value) return
   if (!chosen.value.length) return toast('请先勾选商品')
   if (unavailableCount.value) return toast('请先调整所选商品的数量')
   prepareCartCheckout(chosen.value.map(item => String(item.id)))
@@ -174,7 +243,21 @@ onShow(() => { if (!submitting.value) refresh(); if (checkoutMode.value === 'pic
 .cart-loading-item { display: flex; gap: 12px; padding: 17px 0; margin-top: 16px; border-bottom: 1px solid #e8e4dc; }
 .cart-loading-image { width: 84px; height: 84px; flex: 0 0 auto; border-radius: 6px; }
 @keyframes cart-skeleton { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-.cart-list { padding: 20px 16px 110px; }
+.cart-list { padding: 14px 16px calc(104px + env(safe-area-inset-bottom)); }
+.cart-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cart-heading-title { font-size: 22px; font-weight: 600; line-height: 1.4; color: #322923; }
+.cart-heading-count { margin-left: 9px; font-size: 12px; color: #736a65; }
+.cart-manage { margin: 0; padding: 0 5px 0 15px; height: 44px; color: #782d3b; font-size: 14px; background: transparent; }
+.cart-products, .cart-delivery { padding: 0 12px; border: 1px solid #e9e5e1; border-radius: 14px; background: #fff; }
+.cart-delivery { margin-top: 18px; padding-top: 10px; }
+.cart-list .cart-delivery .fulfillment-switch { margin: 0; }
+.cart-list .cart-delivery .cart-address { border: 0; border-radius: 0; padding: 15px 4px; margin: 0; }
+.cart-list .cart-products .cart-item { border: 0; border-radius: 0; margin: 0; padding: 17px 0; }
+.cart-list .cart-products .cart-item + .cart-item { border-top: 1px solid #eeeae6; }
+.cart-empty { display: flex; flex-direction: column; align-items: center; padding: 16vh 16px 40px; text-align: center; }
+.cart-empty-icon { display: flex; align-items: center; justify-content: center; width: 88px; height: 88px; margin-bottom: 22px; border-radius: 50%; background: #f4e8ea; }
+.cart-empty-tip { margin: 10px 0 24px; color: #706a65; font-size: 14px; }
+.cart-empty .btn { padding: 0 32px; }
 .fulfillment-switch { display: flex; gap: 8px; margin: 0 0 14px; padding: 4px; border-radius: 8px; background: #f1f3ef; }
 .fulfillment-option { flex: 1; min-width: 0; margin: 0; padding: 10px 8px; border: 0; border-radius: 6px; background: transparent; color: #68766e; font-size: 14px; line-height: 1.3; }
 .fulfillment-option::after { border: 0; }
@@ -200,7 +283,6 @@ onShow(() => { if (!submitting.value) refresh(); if (checkoutMode.value === 'pic
 .stepper { display: flex; align-items: center; gap: 10px; }
 .stepper button { width: 26px; height: 26px; padding: 0; border: 1px solid #d6d0c6; background: #fff; line-height: 24px; }
 .stepper button:disabled { color: #a9ada8; background: #f3f4f1; }
-.remove { padding: 0; color: #a49a8d; font-size: 12px; background: transparent; }
 .cart-footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: #fff; box-shadow: 0 -4px 16px rgba(0,0,0,.08); }
 .cart-total-copy { display: flex; flex-direction: column; gap: 3px; }
 .total { color: #a77b2d; font-weight: 700; margin-left: auto; }
@@ -216,5 +298,14 @@ onShow(() => { if (!submitting.value) refresh(); if (checkoutMode.value === 'pic
 .selection-dot { display: inline-flex; width: 19px; height: 19px; border: 1px solid #cec5c0; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; color: #faf9f6; }
 .selection-dot.checked { background: #782d3b; border-color: #782d3b; }
 .cart-check-all { display: flex; align-items: center; gap: 6px; padding: 0; background: transparent; font-size: 12px; min-height: 44px; }
-.cart-item { gap: 8px; }.cart-image { width: 64px; height: 82px; flex-shrink: 0; }.cart-name { font-size: 14px; }.cart-main .muted { font-size: 11px; }.cart-total-copy { margin-left: auto; }.cart-footer .btn { font-size: 13px; }.cart-item .remove { display: none; }
+.cart-item { gap: 8px; }
+.cart-image { width: 72px; height: 88px; flex-shrink: 0; background: #f7f4f0; }
+.cart-name { font-size: 16px; line-height: 1.4; }
+.cart-main .muted { font-size: 12px; }
+.cart-total-copy { margin-left: auto; color: #706a65; font-size: 11px; }
+.cart-total-copy .total { font-size: 20px; line-height: 1.15; }
+.cart-footer .btn { font-size: 14px; }
+.cart-item .stepper { gap: 0; }
+.cart-item .stepper text { min-width: 23px; }
+.cart-item .stepper button { display: flex; align-items: center; justify-content: center; width: 34px; min-height: 34px; border: 0; }
 </style>

@@ -10,7 +10,7 @@
     <EmptyState v-else-if="loadError" title="结算信息暂时无法加载" :description="loadError" button="重新加载" @action="loadCheckout" />
     <view v-else-if="checkoutItems.length" class="section">
       <view class="fulfillment-switch">
-        <button :class="['fulfillment-option', { active: draft.fulfillmentMode !== 'pickup' }]" @click="setFulfillment('delivery')"><AppIcon name="truck" :tone="draft.fulfillmentMode !== 'pickup' ? 'light' : 'ink'" :size="19" />平台配送</button>
+        <button :class="['fulfillment-option', { active: draft.fulfillmentMode !== 'pickup' }]" @click="setFulfillment('delivery')"><AppIcon name="truck" :tone="draft.fulfillmentMode !== 'pickup' ? 'light' : 'ink'" :size="19" />快递邮寄</button>
         <button :class="['fulfillment-option', { active: draft.fulfillmentMode === 'pickup' }]" @click="setFulfillment('pickup')"><AppIcon name="shop" :tone="draft.fulfillmentMode === 'pickup' ? 'light' : 'ink'" :size="19" />门店自提</button>
       </view>
       <button v-if="draft.fulfillmentMode === 'pickup'" class="checkout-address" @click="openStoreSelect">
@@ -141,7 +141,9 @@ const draft = computed(() => state.checkout),
 const checkoutItems = computed(() => draft.value.source === 'cart' ? selectedCartItems() : product.value ? [{ ...product.value, spec: quote.value.spec || product.value.spec, price: quote.value.unitPrice ?? product.value.price, quantity: draft.value.quantity }] : [])
 const hasFulfillmentTarget = computed(() => draft.value.fulfillmentMode === 'pickup' ? Boolean(selectedStore.value) : Boolean(address.value))
 const quote = computed(() =>
-  isApiMode() ? serverQuote.value || { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: '正在计算订单金额' } : product.value
+  isApiMode() ? serverQuote.value || { subtotal: 0, shipping: 0, discount: 0, total: 0, reason: '正在计算订单金额' } : draft.value.source === 'cart'
+    ? quoteOrder(selectedCartItems(), coupon.value)
+    : product.value
     ? quoteOrder(
         [
           {
@@ -156,10 +158,10 @@ const quote = computed(() =>
 )
 const quoteReady = computed(() => hasFulfillmentTarget.value && (!draft.value.couponId || couponReady.value) && (isApiMode()
   ? Boolean(serverQuote.value && !serverQuote.value.reason)
-  : Boolean(product.value && !quote.value.reason)))
+  : Boolean(checkoutItems.value.length && !quote.value.reason)))
 const canSubmit = computed(() => !submitting.value && !loading.value && !loadError.value && !quoteLoading.value && hasFulfillmentTarget.value && quoteReady.value)
 const checkoutMessage = computed(() => {
-  if (draft.value.fulfillmentMode === 'pickup' && storeError.value) return '可重试门店资料，或改用平台配送'
+  if (draft.value.fulfillmentMode === 'pickup' && storeError.value) return '可重试门店资料，或改用快递邮寄'
   if (draft.value.fulfillmentMode === 'pickup' && storeLoading.value) return '正在读取自提门店'
   if (draft.value.fulfillmentMode !== 'pickup' && addressError.value) return '可重试收货地址，或改用门店自提'
   if (draft.value.fulfillmentMode !== 'pickup' && addressLoading.value) return '正在读取收货地址'
@@ -230,7 +232,6 @@ async function refreshStores() {
   try {
     await loadStoreCatalog()
     loaded = true
-    if (!draft.value.pickupStoreId && stores.length) state.checkout.pickupStoreId = String(stores[0].storeId ?? stores[0].id)
   } catch { storeError.value = '自提门店暂时无法加载' }
   finally { storeLoading.value = false; storeReady.value = loaded }
 }
@@ -239,8 +240,14 @@ async function loadCheckout() {
   loadError.value = ''
   if (!isApiMode()) { loading.value = false; return }
   try {
-    await loadProductCatalog()
-    if (draft.value.source === 'cart') { await loadCart(); if (!selectedCartItems().length || selectedCartItems().length !== draft.value.cartItemIds.length) throw new Error('所选商品已变化，请返回购物车重新选择') }
+    if (draft.value.source === 'cart') {
+      await loadCart()
+      if (!selectedCartItems().length || selectedCartItems().length !== draft.value.cartItemIds?.length) {
+        throw new Error('所选商品已变化，请返回购物车重新选择')
+      }
+    } else {
+      await loadProductCatalog()
+    }
     await Promise.all([
       refreshCoupons(),
       draft.value.fulfillmentMode === 'pickup' ? refreshStores() : refreshAddresses(),

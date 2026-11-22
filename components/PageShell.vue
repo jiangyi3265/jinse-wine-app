@@ -37,6 +37,7 @@
         </view>
         <!-- #endif -->
       </view>
+      <slot name="header-tools" />
     </view>
     <slot />
     <ProfileCompletion />

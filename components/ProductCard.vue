@@ -21,6 +21,7 @@ import { addCartItem } from '../services/store.js'
 import { loadProductSkus } from '../services/catalog.js'
 import { isApiMode } from '../services/config.js'
 const adding = ref(false)
+const emit = defineEmits(['added'])
 async function add() {
   if (adding.value || soldOut.value) return
   adding.value = true
@@ -29,6 +30,7 @@ async function add() {
     if (skus.length && !skus.some(sku => sku.stock > 0)) { toast('该商品暂时缺货'); return }
     if (skus.length > 1) { go('product', { id: product.value.id }); toast('请选择商品规格'); return }
     await addCartItem(product.value.id, 1, skus[0]?.skuCode || '')
+    emit('added')
     toast('已加入购物车')
   } catch (error) { toast(error.message) }
   finally { adding.value = false }

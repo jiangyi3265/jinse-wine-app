@@ -11,11 +11,11 @@ async function harness() {
   const page=loadPageScript('checkout',{
     vue,'@dcloudio/uni-app':{onShow(){}},
     '../../services/store.js':{state,submitOrder:async()=>{submissions++;return{id:1}},quoteCheckout:()=>quote(),refreshDomain:async()=>{},loadCart:async()=>[],selectedCartItems:()=>[]},
-    '../../services/catalog.js':{getProduct:()=>product,stores:[],loadProductCatalog:async()=>{},loadCouponCatalog:async()=>{},loadStoreCatalog:async()=>{}},
+    '../../services/catalog.js':{getProduct:()=>product,stores:[{storeId:15,name:'自提门店A'},{storeId:16,name:'自提门店B'}],loadProductCatalog:async()=>{},loadCouponCatalog:async()=>{},loadStoreCatalog:async()=>{}},
     '../../services/pricing.js':{quoteOrder:()=>valid,money:String},
     '../../services/navigation.js':{go(){},confirm:async()=>true,toast(){}},
     '../../services/config.js':{isApiMode:()=>true},'../../services/product-media.js':{productImage:String},
-  })
+  }, { uni: { showActionSheet: ({success}) => success({tapIndex:1}) } })
   await page.loadCheckout();await vue.nextTick()
   return{page,valid,setQuote:fn=>{quote=fn},submissions:()=>submissions}
 }
@@ -27,6 +27,22 @@ test('quote failure is actionable, blocks submission, and a retry restores the c
   h.setQuote(async()=>h.valid);await h.page.updateQuote()
   assert.equal(h.page.quoteError.value,'');assert.equal(h.page.canSubmit.value,true)
   assert.equal(h.page.quote.value.total,14800)
+})
+
+test('pickup waits for the customer to choose a store, delivery only requires an address', async () => {
+  const {page} = await harness()
+  await page.setFulfillment('pickup')
+  await page.updateQuote()
+  assert.equal(page.hasFulfillmentTarget.value, false)
+  assert.equal(page.canSubmit.value, false)
+  await page.openStoreSelect()
+  await vue.nextTick()
+  await page.updateQuote()
+  assert.equal(page.selectedStore.value.storeId, 16)
+  assert.equal(page.canSubmit.value, true)
+  await page.setFulfillment('delivery')
+  await page.updateQuote()
+  assert.equal(page.canSubmit.value, true)
 })
 
 test('an old failed quote cannot replace a newer success or re-enable submission while calculating',async()=>{

@@ -368,13 +368,19 @@ export function updateProfile(name, phone) {
   })
 }
 
+function fulfillmentFields(draft, addressId = draft.addressId) {
+  return draft.fulfillmentMode === 'pickup'
+    ? { fulfillmentMode: 'pickup', pickupStoreId: draft.pickupStoreId }
+    : { fulfillmentMode: 'delivery', addressId }
+}
+
 export function quoteCheckout() {
   if (state.checkout.source === 'cart') return quoteCartOrder()
   if (config.mode !== 'api') return null
   const { productId, skuCode, quantity, couponId, addressId, fulfillmentMode, pickupStoreId } = state.checkout
   if (!productId || (fulfillmentMode === 'pickup' ? !pickupStoreId : !addressId)) return Promise.reject(new Error(fulfillmentMode === 'pickup' ? '请选择自提门店' : '请先选择商品和收货地址'))
   return post('/mini/orders/quote', {
-    productId, skuCode: skuCode || '', quantity, couponId, addressId, fulfillmentMode, pickupStoreId, requestId: state.checkout.requestId,
+    productId, skuCode: skuCode || '', quantity, couponId, ...fulfillmentFields(state.checkout), requestId: state.checkout.requestId,
   })
 }
 
@@ -596,7 +602,7 @@ export function submitOrder() {
       buyerRemark: draft.buyerRemark || '',
       productId: draft.productId, quantity: draft.quantity,
       skuCode: draft.skuCode || '',
-      couponId: draft.couponId, addressId: draft.addressId, fulfillmentMode: draft.fulfillmentMode || 'delivery', pickupStoreId: draft.pickupStoreId, requestId: draft.requestId,
+      couponId: draft.couponId, ...fulfillmentFields(draft), requestId: draft.requestId,
     }, true, draft.requestId).then((data) => {
       const order = normalizeOrder(data)
       state.orders = [order, ...state.orders.filter((item) => item.id !== order.id)]
@@ -793,23 +799,22 @@ export function saveAddress(address) {
   persist()
 }
 
+function cartFulfillmentFields() {
+  const addressId = state.checkout.addressId || state.addresses.find(address => address.isDefault)?.id || state.addresses[0]?.id
+  return fulfillmentFields(state.checkout, addressId)
+}
+
 export function quoteCartOrder() {
-  const mode = state.checkout.fulfillmentMode || 'delivery'
-  const addressId = (state.addresses.find(address => address.id === state.checkout.addressId)
-    || state.addresses.find(address => address.isDefault) || state.addresses[0])?.id
   return post('/mini/orders/cart/quote', {
     cartItemIds: state.checkout.cartItemIds,
-    addressId,
     couponId: state.checkout.couponId || null,
-    fulfillmentMode: mode,
-    pickupStoreId: state.checkout.pickupStoreId,
+    ...cartFulfillmentFields(),
   }, true)
 }
 
 export function submitCartOrder() {
-  const mode = state.checkout.fulfillmentMode || 'delivery'
-  const addressId = state.checkout.addressId || state.addresses.find(address => address.isDefault)?.id || state.addresses[0]?.id
-  const pickupStoreId = state.checkout.pickupStoreId
+  const fulfillment = cartFulfillmentFields()
+  const { fulfillmentMode: mode, addressId, pickupStoreId } = fulfillment
   if (mode === 'pickup' ? !pickupStoreId : !addressId) throw new Error(mode === 'pickup' ? '请选择自提门店' : '请先填写收货地址')
   if (config.mode !== 'api') {
     throw new Error('演示模式请从商品详情下单')
@@ -825,7 +830,7 @@ export function submitCartOrder() {
     state.checkout.cartRequestId = uid('cart-order')
   }
   const requestId = state.checkout.cartRequestId
-  return post('/mini/orders/cart', { addressId, couponId, requestId, fulfillmentMode: mode, pickupStoreId, cartItemIds: state.checkout.cartItemIds, buyerRemark: state.checkout.buyerRemark || '' }, true, requestId)
+  return post('/mini/orders/cart', { ...fulfillment, couponId, requestId, cartItemIds: state.checkout.cartItemIds, buyerRemark: state.checkout.buyerRemark || '' }, true, requestId)
     .then(orderData => {
       const order = normalizeOrder(orderData)
       state.orders = [order, ...state.orders.filter(item => item.id !== order.id)]
@@ -839,9 +844,17 @@ export function submitCartOrder() {
     })
 }
 
-export function loadCart() {
+export function fetchCart() {
   if (config.mode !== 'api') return Promise.resolve(state.cart || [])
-  return get('/mini/cart', true).then(items => { state.cart = items || []; return state.cart })
+  return get('/mini/cart', true).then(items => items || [])
+}
+
+let cartReadRevision = 0
+export async function loadCart() {
+  const revision = ++cartReadRevision
+  const items = await fetchCart()
+  if (revision === cartReadRevision) state.cart = items
+  return items
 }
 
 export function addCartItem(productId, quantity = 1, skuCode = '') {
